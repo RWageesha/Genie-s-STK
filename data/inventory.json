@@ -1,0 +1,9 @@
+[
+    {
+        "product_id": "P001",
+        "name": "Laptop",
+        "price": 1200,
+        "quantity": 10,
+        "category": "Electronics"
+    }
+]
