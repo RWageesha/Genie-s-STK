@@ -1,7 +1,10 @@
+# data/repositories.py
+
 from abc import ABC, abstractmethod
 from datetime import date
 from typing import List, Optional
 from domain.domain_models import Product, Batch, SaleRecord, Order
+
 
 class ProductRepository(ABC):
     @abstractmethod

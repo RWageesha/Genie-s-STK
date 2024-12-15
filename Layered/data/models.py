@@ -1,7 +1,10 @@
+# data/models.py
+
 from sqlalchemy import Column, Integer, String, Float, Date, ForeignKey
 from sqlalchemy.orm import relationship, declarative_base
 
 Base = declarative_base()
+
 
 class ProductModel(Base):
     __tablename__ = 'products'
@@ -14,7 +17,8 @@ class ProductModel(Base):
     unit_price = Column(Float, nullable=False)
     reorder_level = Column(Integer, default=0)
 
-    batches = relationship("BatchModel", back_populates="product")
+    batches = relationship("BatchModel", back_populates="product", cascade="all, delete-orphan")
+    sale_records = relationship("SaleRecordModel", back_populates="product", cascade="all, delete-orphan")  # Optional for bidirectional access
 
 
 class BatchModel(Base):
@@ -37,8 +41,10 @@ class SaleRecordModel(Base):
     quantity_sold = Column(Integer, nullable=False)
     sale_date = Column(Date, nullable=False)
     unit_price_at_sale = Column(Float, nullable=False)
+    report_id = Column(Integer, ForeignKey('sales_reports.report_id'), nullable=True)  # Added ForeignKey
 
-    product = relationship("ProductModel")
+    product = relationship("ProductModel", back_populates="sale_records")  # Optional, for bidirectional access
+    report = relationship("SalesReportModel", back_populates="sales")  # Reciprocal relationship
 
 
 class OrderModel(Base):
@@ -49,7 +55,8 @@ class OrderModel(Base):
     order_date = Column(Date, nullable=False)
     expected_delivery_date = Column(Date, nullable=False)
 
-    items = relationship("OrderItemModel", back_populates="order")
+    items = relationship("OrderItemModel", back_populates="order", cascade="all, delete-orphan")
+    supplier = relationship("SupplierModel", back_populates="orders")
 
 
 class OrderItemModel(Base):
@@ -64,6 +71,7 @@ class OrderItemModel(Base):
     order = relationship("OrderModel", back_populates="items")
     product = relationship("ProductModel")
 
+
 class SalesReportModel(Base):
     __tablename__ = 'sales_reports'
 
@@ -71,4 +79,18 @@ class SalesReportModel(Base):
     report_date = Column(Date, nullable=False)
     total_sales = Column(Float, nullable=False)
 
-    sales = relationship("SaleRecordModel", back_populates="report")
+    sales = relationship("SaleRecordModel", back_populates="report", cascade="all, delete-orphan")
+
+
+# Define Supplier Model
+class SupplierModel(Base):
+    __tablename__ = 'suppliers'
+
+    supplier_id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String, nullable=False)
+    contact_person = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    email = Column(String, nullable=True)
+
+    # Establish a relationship with orders
+    orders = relationship("OrderModel", back_populates="supplier", cascade="all, delete-orphan")

@@ -1,3 +1,5 @@
+# domain/domain_models.py
+
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Dict, List, Optional
@@ -5,11 +7,11 @@ from typing import Dict, List, Optional
 
 @dataclass
 class Product:
-    product_id: int
+    product_id: Optional[int]
     sku: str
     name: str
     category: str
-    description: str
+    description: Optional[str]
     unit_price: float
     reorder_level: int = 0
 
@@ -20,12 +22,12 @@ class Product:
             raise ValueError("Reorder level cannot be negative.")
         if not self.sku:
             raise ValueError("SKU cannot be empty.")
-    # make a function to calc discounted prices if needed
+    # Add methods as needed
 
 
 @dataclass
 class Batch:
-    batch_id: int
+    batch_id: Optional[int]
     product_id: int
     quantity: int
     manufacture_date: date
@@ -51,7 +53,7 @@ class Batch:
 
 @dataclass
 class SaleRecord:
-    sale_id: int
+    sale_id: Optional[int]
     product_id: int
     quantity_sold: int
     sale_date: date
@@ -69,16 +71,15 @@ class SaleRecord:
 
 @dataclass
 class Supplier:
-    supplier_id: int
+    supplier_id: Optional[int]
     name: str
-    contact_info: str
-    address: str
+    contact_person: Optional[str]
+    phone: Optional[str]
+    email: Optional[str]
 
     def __post_init__(self):
         if not self.name:
             raise ValueError("Supplier name cannot be empty.")
-        if not self.contact_info:
-            raise ValueError("Contact info cannot be empty.")
 
 
 @dataclass
@@ -99,11 +100,11 @@ class OrderItem:
 
 @dataclass
 class Order:
-    order_id: int
+    order_id: Optional[int]
     supplier_id: int
     order_date: date
     expected_delivery_date: date
-    items: List[OrderItem] = field(default_factory=list) #*field(default_factory=list) ensures that each Inventory instance has its own list rather than sharing references.
+    items: List[OrderItem] = field(default_factory=list)
 
     def __post_init__(self):
         if self.expected_delivery_date < self.order_date:
@@ -114,41 +115,10 @@ class Order:
     def total_order_cost(self) -> float:
         return sum(item.total_cost() for item in self.items)
 
+
 @dataclass
-class Inventory:
-    products: List[Product] = field(default_factory=list)
-    batches: List[Batch] = field(default_factory=list)
-
-    def add_product(self, product: Product):
-        self.products.append(product)
-
-    def add_batch(self, batch: Batch):
-        self.batches.append(batch)
-        self.batches.sort(key=lambda b: b.expiry_date)  #! Prioritize older stocks
-        #todo implement this prioratization using sorting algorithms
-
-    def get_expiring_soon(self, days_threshold: int = 30) -> List[Batch]:
-        """Return batches expiring within the given threshold."""
-        return [batch for batch in self.batches if batch.is_expiring_soon(days_threshold)]
-
-    def search_product(self, name: str) -> Optional[Product]:
-        """Search for a product by name."""
-        return next((product for product in self.products if product.name == name), None)
-
-    def reduce_stock(self, product_id: int, quantity: int):
-        """Reduce stock using FIFO to ensure older stocks are sold first."""
-        relevant_batches = [batch for batch in self.batches if batch.product_id == product_id and batch.quantity > 0]
-        relevant_batches.sort(key=lambda b: b.manufacture_date)
-        for batch in relevant_batches:
-            if batch.quantity >= quantity:
-                batch.reduce_quantity(quantity)
-                break
-            else:
-                quantity -= batch.quantity
-                batch.reduce_quantity(batch.quantity)
-    @dataclass
-    class SalesReport:
-        start_date: date
-        end_date: date
-        total_sales: float
-        sales_by_product: Dict[str, float]
+class SalesReport:
+    start_date: date
+    end_date: date
+    total_sales: float
+    sales_by_product: Dict[str, float]

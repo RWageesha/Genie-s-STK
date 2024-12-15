@@ -1,11 +1,14 @@
+# data/sqlalchemy_repositories.py
+
 from typing import List, Optional
 from datetime import date
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
-from domain.domain_models import OrderItem, Product, Batch, SaleRecord, Order
+from domain.domain_models import OrderItem, Product, Batch, SaleRecord, Order, SalesReport
 from data.repositories import ProductRepository, BatchRepository, SaleRecordRepository, OrderRepository
-from data.models import ProductModel, BatchModel, SaleRecordModel, OrderModel, OrderItemModel
+from data.models import ProductModel, BatchModel, SaleRecordModel, OrderModel, OrderItemModel, SalesReportModel
+
 
 class SQLAlchemyProductRepository(ProductRepository):
     def __init__(self, session: Session):
@@ -68,7 +71,6 @@ class SQLAlchemyProductRepository(ProductRepository):
         )
 
 
-# Similarly, implement SQLAlchemyBatchRepository, SQLAlchemySaleRecordRepository, SQLAlchemyOrderRepository
 class SQLAlchemyBatchRepository(BatchRepository):
     def __init__(self, session: Session):
         self.session = session
@@ -127,7 +129,11 @@ class SQLAlchemySaleRecordRepository(SaleRecordRepository):
     def record_sale(self, sale_record: SaleRecord) -> SaleRecord:
         sale_model = self._map_to_model(sale_record)
         self.session.add(sale_model)
-        self.session.commit()
+        try:
+            self.session.commit()
+        except SQLAlchemyError as e:
+            self.session.rollback()
+            raise e
         return self._map_to_domain(sale_model)
 
     def get_sales_between_dates(self, start_date: date, end_date: date) -> List[SaleRecord]:
@@ -151,9 +157,11 @@ class SQLAlchemySaleRecordRepository(SaleRecordRepository):
             product_id=sale.product_id,
             quantity_sold=sale.quantity_sold,
             sale_date=sale.sale_date,
-            unit_price_at_sale=sale.unit_price_at_sale
+            unit_price_at_sale=sale.unit_price_at_sale,
+            report_id=None  # Explicitly setting to None; adjust as needed
         )
-# Similarly, implement SQLAlchemyOrderRepository
+
+
 class SQLAlchemyOrderRepository(OrderRepository):
     def __init__(self, session: Session):
         self.session = session
@@ -161,7 +169,11 @@ class SQLAlchemyOrderRepository(OrderRepository):
     def add_order(self, order: Order) -> Order:
         order_model = self._map_to_model(order)
         self.session.add(order_model)
-        self.session.commit()
+        try:
+            self.session.commit()
+        except SQLAlchemyError as e:
+            self.session.rollback()
+            raise e
         return self._map_to_domain(order_model)
 
     def get_orders(self) -> List[Order]:
@@ -197,4 +209,3 @@ class SQLAlchemyOrderRepository(OrderRepository):
             ]
         )
         return order_model
-
