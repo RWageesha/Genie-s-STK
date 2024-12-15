@@ -1,15 +1,16 @@
+# services/inventory_service.py
 
 from contextlib import contextmanager
-from typing import List, Optional ,Dict
+from typing import List, Optional, Dict
 from datetime import date
 from collections import defaultdict
-
 
 from sqlalchemy.orm import Session
 
 from domain.domain_models import Product, Batch, SaleRecord, SalesReport
 from domain.inventory import Inventory
 from data.repositories import ProductRepository, BatchRepository, SaleRecordRepository
+
 
 class InventoryService:
     def __init__(self, 
@@ -27,7 +28,7 @@ class InventoryService:
 
     # Product Operations
     def add_product(self, product: Product) -> Product:
-        # Make sure SKU is unique (the repository or database unique constraint will also enforce this)
+        # Ensure SKU is unique
         existing = self.product_repo.get_product_by_sku(product.sku)
         if existing:
             raise ValueError(f"Product with SKU '{product.sku}' already exists.")
@@ -55,6 +56,7 @@ class InventoryService:
                 raise AttributeError(f"Product has no attribute '{key}'.")
 
         self.product_repo.update_product(product)
+
         # Update in-memory inventory
         inventory_product = next((p for p in self.inventory.products if p.product_id == product_id), None)
         if inventory_product:
@@ -74,7 +76,7 @@ class InventoryService:
         # If not found in memory (unlikely if inventory is always synced), try repository
         return self.product_repo.get_product_by_sku(sku)
 
-    # Batch Operations--------------------------------------------
+    # Batch Operations
     def add_batch(self, batch: Batch) -> Batch:
         # Ensure the product exists
         product = self.product_repo.get_product_by_id(batch.product_id)
@@ -97,6 +99,7 @@ class InventoryService:
                 raise AttributeError(f"Batch has no attribute '{key}'.")
 
         self.batch_repo.update_batch(batch)
+
         # Update in-memory inventory
         inventory_batch = next((b for b in self.inventory.batches if b.batch_id == batch_id), None)
         if inventory_batch:
@@ -111,13 +114,6 @@ class InventoryService:
     # Stock Level Tracking
     def get_stock_level(self, product_id: int) -> int:
         return self.inventory.get_stock_level(product_id)
-
-    # Searching and Filtering
-    def search_products(self, keyword: str) -> List[Product]:
-        return self.inventory.search_products(keyword)
-
-    def filter_batches_by_expiry(self, before_date: date) -> List[Batch]:
-        return self.inventory.filter_batches_by_expiry(before_date)
 
     # Selling Products 
     def sell_product(self, product_id: int, quantity: int) -> SaleRecord:
@@ -163,6 +159,7 @@ class InventoryService:
     def _is_below_reorder(self, product: Product) -> bool:
         total_quantity = self.get_stock_level(product.product_id)
         return total_quantity <= product.reorder_level
+
     @contextmanager
     def session_scope(self):
         """Provide a transactional scope around a series of operations."""
@@ -173,7 +170,7 @@ class InventoryService:
         except Exception:
             session.rollback()
             raise
-    
+
     def generate_sales_report(self, start_date: date, end_date: date) -> SalesReport:
         sales = self.sale_repo.get_sales_between_dates(start_date, end_date)
         report_data = defaultdict(float)
