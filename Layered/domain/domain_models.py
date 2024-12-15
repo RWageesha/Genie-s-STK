@@ -1,30 +1,31 @@
 from dataclasses import dataclass, field
 from datetime import date
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 
 @dataclass
 class Product:
     product_id: int
-    sku: str  # Stock Keeping Unit
+    sku: str
     name: str
     category: str
     description: str
     unit_price: float
-    reorder_level: int = 0  # Threshold for reordering
+    reorder_level: int = 0
 
     def __post_init__(self):
         if self.unit_price < 0:
             raise ValueError("Unit price cannot be negative.")
         if self.reorder_level < 0:
             raise ValueError("Reorder level cannot be negative.")
-        
+        if not self.sku:
+            raise ValueError("SKU cannot be empty.")
     # make a function to calc discounted prices if needed
 
 
 @dataclass
 class Batch:
-    batch_id: str
+    batch_id: int
     product_id: int
     quantity: int
     manufacture_date: date
@@ -102,7 +103,7 @@ class Order:
     supplier_id: int
     order_date: date
     expected_delivery_date: date
-    items: List[OrderItem] = field(default_factory=list)
+    items: List[OrderItem] = field(default_factory=list) #*field(default_factory=list) ensures that each Inventory instance has its own list rather than sharing references.
 
     def __post_init__(self):
         if self.expected_delivery_date < self.order_date:
@@ -123,7 +124,8 @@ class Inventory:
 
     def add_batch(self, batch: Batch):
         self.batches.append(batch)
-        self.batches.sort(key=lambda b: b.expiry_date)  # Prioritize older stocks
+        self.batches.sort(key=lambda b: b.expiry_date)  #! Prioritize older stocks
+        #todo implement this prioratization using sorting algorithms
 
     def get_expiring_soon(self, days_threshold: int = 30) -> List[Batch]:
         """Return batches expiring within the given threshold."""
@@ -144,3 +146,9 @@ class Inventory:
             else:
                 quantity -= batch.quantity
                 batch.reduce_quantity(batch.quantity)
+    @dataclass
+    class SalesReport:
+        start_date: date
+        end_date: date
+        total_sales: float
+        sales_by_product: Dict[str, float]
