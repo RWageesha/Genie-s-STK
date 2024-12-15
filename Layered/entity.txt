@@ -1,0 +1,60 @@
+@startuml
+class Product {
+    int product_id
+    str sku # Stock Keeping Unit
+    str name
+    str category
+    str description
+    float unit_price
+    int reorder_level
+}
+
+class Batch {
+    str batch_id
+    int product_id
+    int quantity
+    date manufacture_date
+    date expiry_date
+}
+
+class SaleRecord {
+    int sale_id
+    int product_id
+    int quantity_sold
+    date sale_date
+    float unit_price_at_sale
+}
+
+class Supplier {
+    int supplier_id
+    str name
+    str contact_info
+    str address
+}
+
+class OrderItem {
+    int product_id
+    int quantity
+    float cost_per_unit
+}
+
+class Order {
+    int order_id
+    int supplier_id
+    date order_date
+    date expected_delivery_date
+    List<OrderItem> items
+}
+
+class Inventory {
+    List<Product> products
+    List<Batch> batches
+}
+
+Product "1" o-- "*" Batch : "has"
+Product "1" -- "*" SaleRecord : "sold in"
+Supplier "1" o-- "*" Order : "provides"
+Order "1" o-- "*" OrderItem : "contains"
+Inventory "1" *-- "*" Product : "manages"
+Inventory "1" *-- "*" Batch : "contains"
+@enduml

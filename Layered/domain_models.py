@@ -6,6 +6,7 @@ from typing import List, Optional
 @dataclass
 class Product:
     product_id: int
+    sku: str  # Stock Keeping Unit
     name: str
     category: str
     description: str
@@ -17,11 +18,13 @@ class Product:
             raise ValueError("Unit price cannot be negative.")
         if self.reorder_level < 0:
             raise ValueError("Reorder level cannot be negative.")
+        
+    # make a function to calc discounted prices if needed
 
 
 @dataclass
 class Batch:
-    batch_id: int
+    batch_id: str
     product_id: int
     quantity: int
     manufacture_date: date
@@ -109,3 +112,35 @@ class Order:
 
     def total_order_cost(self) -> float:
         return sum(item.total_cost() for item in self.items)
+
+@dataclass
+class Inventory:
+    products: List[Product] = field(default_factory=list)
+    batches: List[Batch] = field(default_factory=list)
+
+    def add_product(self, product: Product):
+        self.products.append(product)
+
+    def add_batch(self, batch: Batch):
+        self.batches.append(batch)
+        self.batches.sort(key=lambda b: b.expiry_date)  # Prioritize older stocks
+
+    def get_expiring_soon(self, days_threshold: int = 30) -> List[Batch]:
+        """Return batches expiring within the given threshold."""
+        return [batch for batch in self.batches if batch.is_expiring_soon(days_threshold)]
+
+    def search_product(self, name: str) -> Optional[Product]:
+        """Search for a product by name."""
+        return next((product for product in self.products if product.name == name), None)
+
+    def reduce_stock(self, product_id: int, quantity: int):
+        """Reduce stock using FIFO to ensure older stocks are sold first."""
+        relevant_batches = [batch for batch in self.batches if batch.product_id == product_id and batch.quantity > 0]
+        relevant_batches.sort(key=lambda b: b.manufacture_date)
+        for batch in relevant_batches:
+            if batch.quantity >= quantity:
+                batch.reduce_quantity(quantity)
+                break
+            else:
+                quantity -= batch.quantity
+                batch.reduce_quantity(batch.quantity)
