@@ -1,0 +1,48 @@
+/* styles.qss */
+
+QWidget {
+    background-color: #f0f0f0;
+    font-family: "Segoe UI", sans-serif;
+    font-size: 14px;
+}
+
+QPushButton {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 14px;
+    margin: 4px 2px;
+    border-radius: 4px;
+    transition-duration: 0.4s;
+}
+
+QPushButton:hover {
+    background-color: #45a049;
+    cursor: pointer;
+}
+
+QTableWidget {
+    background-color: white;
+    border-color: #cccccc;
+}
+
+QHeaderView::section {
+    background-color: #4CAF50;
+    color: white;
+    padding: 4px;
+    font-size: 14px;
+}
+
+QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QDateEdit {
+    padding: 4px;
+    border: 1px solid #cccccc;
+    border-radius: 4px;
+}
+
+QDialog {
+    background-color: #ffffff;
+}

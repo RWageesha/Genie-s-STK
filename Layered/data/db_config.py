@@ -9,12 +9,10 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DATABASE_URL = "postgresql://postgres:pass@localhost:5432/pharmacy_db"
+DATABASE_URL = "postgresql://postgres:123@localhost:5432/pharmacy_db"
 
-engine = create_engine(DATABASE_URL, echo=True)
-
-# Create a configured "Session" class
-SessionLocal = scoped_session(sessionmaker(bind=engine))
+engine = create_engine(DATABASE_URL, echo=True, future=True)
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
 def init_db():
