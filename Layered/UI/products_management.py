@@ -3,6 +3,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QDialog
 )
+from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt
 
 from .add_product_dialog import AddProductDialog
@@ -43,7 +44,59 @@ class ProductsManagement(QWidget):
         self.layout.addWidget(self.table)
         
         self.load_products()
-    
+        self.apply_styles()
+
+    def apply_styles(self):
+        # Apply modern UI design based on the provided guidelines
+        self.setFont(QFont("Roboto", 14))
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #1e1e2d;
+                color: #c4c4c4;
+                font-family: "Roboto";
+            }
+
+            QPushButton {
+                background-color: #00adb5;
+                color: #ffffff;
+                border-radius: 5px;
+                padding: 8px 12px;
+                font-weight: bold;
+            }
+
+            QPushButton:hover {
+                background-color: #007f8b;
+            }
+
+            QTableWidget {
+                background-color: #1e1e2d;
+                gridline-color: #5a5f66;
+                border: 1px solid #5a5f66;
+                font-size: 14px;
+            }
+
+            QTableWidget::item {
+                color: #ffffff;
+            }
+
+            QTableWidget::item:selected {
+                background-color: #323544;
+            }
+
+            QHeaderView::section {
+                background-color: #2b2b3c;
+                color: #ffffff;
+                font-weight: bold;
+                border: none;
+                padding: 4px;
+            }
+
+            QMessageBox {
+                background-color: #1e1e2d;
+                color: #c4c4c4;
+            }
+        """)
+
     def load_products(self):
         self.table.setRowCount(0)
         products = self.inventory_service.get_all_products()

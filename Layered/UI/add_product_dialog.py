@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import (
     QDialog, QDialogButtonBox, QFormLayout, QLineEdit, QSpinBox,
     QDoubleSpinBox, QMessageBox, QVBoxLayout, QLabel, QFrame
 )
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QIcon, QFont
 from PyQt6.QtCore import Qt
 from domain.domain_models import Product
 
@@ -11,80 +11,102 @@ class AddProductDialog(QDialog):
     def __init__(self, parent=None, product: Product = None):
         super().__init__(parent)
         self.setWindowTitle("Add Product" if product is None else f"Edit Product: {product.name}")
-        self.setFixedWidth(400)
+        self.setFixedWidth(450)  # Increased width for better spacing
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint)  # Remove help button
+
         self.setStyleSheet("""
             QDialog {
-                background-color: #1e1e2d;
-                color: #ffffff;
-                border-radius: 10px;
-                font-family: Arial, sans-serif;
-                font-size: 14px;
+                background-color: #2C2C3E;
+                color: #E0E0E0;
+                border-radius: 12px;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                font-size: 15px;
             }
             QLabel {
-                font-size: 14px;
-                color: #ffffff; /* Ensures text is white */
-                background-color: transparent; /* Fixes white background issue */
+                font-size: 15px;
+                color: #E0E0E0;
+                background-color: transparent;
             }
             QLineEdit, QSpinBox, QDoubleSpinBox {
-                background-color: #2b2b3c;
-                color: #ffffff;
-                border: 1px solid #5a5f66;
-                border-radius: 5px;
-                padding: 5px;
-                font-size: 14px;
+                background-color: #3A3A4D;
+                color: #FFFFFF;
+                border: 1px solid #555555;
+                border-radius: 6px;
+                padding: 8px;
+                font-size: 15px;
+            }
+            QLineEdit::placeholder {
+                color: #B0B0B0;
             }
             QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus {
-                border: 1px solid #00adb5;
+                border: 2px solid #00ADB5;
+                outline: none;
             }
             QPushButton {
-                background-color: #00adb5;
-                color: #ffffff;
+                background-color: #00ADB5;
+                color: #FFFFFF;
                 border: none;
-                border-radius: 5px;
-                padding: 8px 12px;
-                font-size: 14px;
+                border-radius: 6px;
+                padding: 10px 20px;
+                font-size: 15px;
                 font-weight: bold;
+                min-width: 100px;
             }
             QPushButton:hover {
-                background-color: #007f8b;
+                background-color: #009A9C;
             }
-            QDialogButtonBox QPushButton {
-                background-color: #00adb5;
-                color: #ffffff;
+            QPushButton:pressed {
+                background-color: #007F7F;
             }
-            QDialogButtonBox QPushButton:hover {
-                background-color: #007f8b;
+            QDialogButtonBox {
+                border: none;
             }
         """)
 
-
-
         # Main Layout
         self.main_layout = QVBoxLayout(self)
-        self.main_layout.setSpacing(15)
+        self.main_layout.setSpacing(20)
+        self.main_layout.setContentsMargins(20, 20, 20, 20)
 
         # Header
         header = QLabel("Add Product" if product is None else "Edit Product")
         header.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        header.setStyleSheet("font-size: 18px; font-weight: bold; color: #00adb5;")
+        header.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
+        header.setStyleSheet("color: #00ADB5;")
         self.main_layout.addWidget(header)
+
+        # Separator Line
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setFrameShadow(QFrame.Shadow.Sunken)
+        separator.setStyleSheet("color: #555555;")
+        self.main_layout.addWidget(separator)
 
         # Form Layout
         self.form_layout = QFormLayout()
-        self.form_layout.setVerticalSpacing(10)
+        self.form_layout.setVerticalSpacing(15)
+        self.form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        self.form_layout.setFormAlignment(Qt.AlignmentFlag.AlignCenter)
         self.main_layout.addLayout(self.form_layout)
 
         # Fields
         self.sku_edit = QLineEdit()
+        self.sku_edit.setPlaceholderText("Enter SKU")
         self.name_edit = QLineEdit()
+        self.name_edit.setPlaceholderText("Enter Product Name")
         self.category_edit = QLineEdit()
+        self.category_edit.setPlaceholderText("Enter Category")
         self.description_edit = QLineEdit()
+        self.description_edit.setPlaceholderText("Enter Description")
         self.unit_price_edit = QDoubleSpinBox()
         self.unit_price_edit.setRange(0.01, 1000000.00)
         self.unit_price_edit.setDecimals(2)
         self.unit_price_edit.setSingleStep(0.10)
+        self.unit_price_edit.setPrefix("$ ")
+        self.unit_price_edit.setStyleSheet("padding-right: 20px;")
         self.reorder_level_edit = QSpinBox()
         self.reorder_level_edit.setRange(0, 1000000)
+        self.reorder_level_edit.setSuffix(" units")
 
         # Add Fields to Form
         self.form_layout.addRow("SKU:", self.sku_edit)
@@ -98,9 +120,15 @@ class AddProductDialog(QDialog):
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         self.button_box.button(QDialogButtonBox.StandardButton.Ok).setText("Save")
         self.button_box.button(QDialogButtonBox.StandardButton.Cancel).setText("Cancel")
+        self.button_box.button(QDialogButtonBox.StandardButton.Ok).setFixedHeight(40)
+        self.button_box.button(QDialogButtonBox.StandardButton.Cancel).setFixedHeight(40)
         self.button_box.accepted.connect(self.validate_and_accept)
         self.button_box.rejected.connect(self.reject)
-        self.main_layout.addWidget(self.button_box)
+
+        # Button Layout Adjustment
+        button_layout = QVBoxLayout()
+        button_layout.addWidget(self.button_box)
+        self.main_layout.addLayout(button_layout)
 
         # Pre-fill form if editing an existing product
         if product:

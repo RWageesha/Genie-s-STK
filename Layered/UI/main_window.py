@@ -112,7 +112,7 @@ class ModernSidebarUI(QMainWindow):
         self.stack = QStackedWidget()
         self.stack.setStyleSheet("""
             QStackedWidget {
-                background-color: #ffffff;
+                background-color: #1e1e2d;
             }
         """)
 

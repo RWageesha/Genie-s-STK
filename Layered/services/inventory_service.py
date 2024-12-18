@@ -106,22 +106,18 @@ class InventoryService:
         return self.sale_repo.get_sale_by_id(sale_id)
 
     def record_sale(self, sale: SaleRecord) -> SaleRecord:
-        # Decrement the product quantity from batches (FIFO)
-        batches = sorted(
-            self.batch_repo.get_all_batches(),
-            key=lambda b: b.manufacture_date
-        )
-        quantity_to_sell = sale.quantity_sold
-        for batch in batches:
-            if batch.product_id == sale.product_id and batch.quantity >= quantity_to_sell:
-                batch.quantity -= quantity_to_sell
-                self.batch_repo.update_batch(batch)
-                break
-            elif batch.product_id == sale.product_id and batch.quantity > 0:
-                quantity_to_sell -= batch.quantity
-                batch.quantity = 0
-                self.batch_repo.update_batch(batch)
-        return self.sale_repo.record_sale(sale)
+        # Use the batch_repo method to reduce quantity directly:
+        self.batch_repo.reduce_quantity(sale.product_id, sale.quantity_sold)
+
+        # Convert SaleRecord to dict for the repository:
+        sale_dict = {
+            "product_id": sale.product_id,
+            "quantity_sold": sale.quantity_sold,
+            "sale_date": sale.sale_date,
+            "unit_price_at_sale": sale.unit_price_at_sale
+        }
+        return self.sale_repo.record_sale(sale_dict)
+
     
     def get_available_quantity(self, product_id: int) -> int:
         return self.batch_repo.get_available_quantity(product_id)

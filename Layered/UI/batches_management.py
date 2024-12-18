@@ -2,11 +2,13 @@
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,
-    QMessageBox, QDialog, QHBoxLayout, QHeaderView  # Import QHeaderView
+    QMessageBox, QDialog, QHBoxLayout, QHeaderView
 )
+from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt
+
 from .add_batch_dialog import AddBatchDialog
-from .edit_batch_dialog import EditBatchDialog  # Ensure this dialog exists
+from .edit_batch_dialog import EditBatchDialog
 from domain.domain_models import Batch, Product
 from typing import List, Optional
 
@@ -15,7 +17,7 @@ class BatchesManagement(QWidget):
         super().__init__()
         self.inventory_service = inventory_service
         self.init_ui()
-    
+
     def init_ui(self):
         layout = QVBoxLayout()
         
@@ -55,13 +57,66 @@ class BatchesManagement(QWidget):
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.table.horizontalHeader().setStretchLastSection(True)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)  # Updated line
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.table)
         
         self.setLayout(layout)
         
+        self.apply_styles()
         self.load_batches()
-    
+
+    def apply_styles(self):
+        # Apply modern UI design based on the provided guidelines
+        self.setFont(QFont("Roboto", 14))
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #1e1e2d;
+                color: #c4c4c4;
+                font-family: "Roboto";
+                font-size: 14px;
+            }
+
+            QPushButton {
+                background-color: #00adb5;
+                color: #ffffff;
+                border-radius: 5px;
+                padding: 8px 12px;
+                font-weight: bold;
+            }
+
+            QPushButton:hover {
+                background-color: #007f8b;
+            }
+
+            QTableWidget {
+                background-color: #1e1e2d;
+                gridline-color: #5a5f66;
+                border: 1px solid #5a5f66;
+                font-size: 14px;
+            }
+
+            QTableWidget::item {
+                color: #ffffff;
+            }
+
+            QTableWidget::item:selected {
+                background-color: #323544;
+            }
+
+            QHeaderView::section {
+                background-color: #2b2b3c;
+                color: #ffffff;
+                font-weight: bold;
+                border: none;
+                padding: 4px;
+            }
+
+            QMessageBox {
+                background-color: #1e1e2d;
+                color: #c4c4c4;
+            }
+        """)
+
     def load_batches(self):
         """
         Loads all batches from the inventory service and displays them in the table.
@@ -77,7 +132,7 @@ class BatchesManagement(QWidget):
                 self.table.setItem(row, 4, QTableWidgetItem(batch.expiry_date.strftime("%Y-%m-%d")))
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to load batches: {str(e)}")
-    
+
     def add_batch(self):
         """
         Opens the AddBatchDialog to collect batch details and adds the batch upon successful input.
@@ -96,7 +151,7 @@ class BatchesManagement(QWidget):
                 self.load_batches()
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to add batch: {str(e)}")
-    
+
     def edit_batch(self):
         """
         Opens the EditBatchDialog to modify the selected batch's details.
@@ -126,7 +181,7 @@ class BatchesManagement(QWidget):
                 self.load_batches()
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to update batch: {str(e)}")
-    
+
     def delete_batch(self):
         """
         Deletes the selected batch after confirmation.

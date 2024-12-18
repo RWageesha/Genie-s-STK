@@ -3,6 +3,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QDialog
 )
+from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt
 
 from .sell_product_dialog import SellProductDialog
@@ -14,7 +15,7 @@ class SalesManagement(QWidget):
         self.layout = QVBoxLayout()
         self.setLayout(self.layout)
         
-        # Top buttons
+        # Top buttons layout
         btn_layout = QHBoxLayout()
         self.record_sale_btn = QPushButton("Record Sale")
         self.view_details_btn = QPushButton("View Sale Details")
@@ -37,10 +38,65 @@ class SalesManagement(QWidget):
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.horizontalHeader().setStretchLastSection(True)
+        
         self.layout.addWidget(self.table)
         
         self.load_sales()
-    
+        self.apply_styles()
+
+    def apply_styles(self):
+        # Apply modern UI design based on the provided guidelines
+        self.setFont(QFont("Roboto", 14))
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #1e1e2d;
+                color: #c4c4c4;
+                font-family: "Roboto";
+                font-size: 14px;
+            }
+            
+
+            QPushButton {
+                background-color: #00adb5;
+                color: #ffffff;
+                border-radius: 5px;
+                padding: 8px 12px;
+                font-weight: bold;
+            }
+
+            QPushButton:hover {
+                background-color: #007f8b;
+            }
+
+            QTableWidget {
+                background-color: #1e1e2d;
+                gridline-color: #5a5f66;
+                border: 1px solid #5a5f66;
+                font-size: 14px;
+            }
+
+            QTableWidget::item {
+                color: #ffffff;
+            }
+
+            QTableWidget::item:selected {
+                background-color: #323544;
+            }
+
+            QHeaderView::section {
+                background-color: #2b2b3c;
+                color: #ffffff;
+                font-weight: bold;
+                border: none;
+                padding: 4px;
+            }
+
+            QMessageBox {
+                background-color: #1e1e2d;
+                color: #c4c4c4;
+            }
+        """)
+
     def load_sales(self):
         self.table.setRowCount(0)
         sales = self.inventory_service.get_all_sales()
@@ -55,7 +111,7 @@ class SalesManagement(QWidget):
             total_value = sale.quantity_sold * sale.unit_price_at_sale
             self.table.setItem(row_position, 5, QTableWidgetItem(f"{total_value:.2f}"))
         self.table.resizeColumnsToContents()
-    
+
     def record_sale(self):
         dialog = SellProductDialog(self, self.inventory_service)
         if dialog.exec() == QDialog.DialogCode.Accepted:
@@ -66,7 +122,7 @@ class SalesManagement(QWidget):
                 self.load_sales()
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to record sale: {e}")
-    
+
     def view_sale_details(self):
         selected_items = self.table.selectedItems()
         if not selected_items:

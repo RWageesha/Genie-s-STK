@@ -3,6 +3,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QDateEdit, QTextEdit, QMessageBox
 )
+from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt
 
 import matplotlib.pyplot as plt
@@ -53,7 +54,79 @@ class Reports(QWidget):
         # Report visualization
         self.canvas = FigureCanvas(plt.Figure(figsize=(5, 3)))
         self.layout.addWidget(self.canvas)
-    
+        
+        self.apply_styles()
+
+    def apply_styles(self):
+        # Apply modern UI design based on the provided guidelines
+        self.setFont(QFont("Roboto", 14))
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #1e1e2d; 
+                color: #c4c4c4; 
+                font-family: "Roboto"; 
+                font-size: 14px;
+            }
+
+            QLabel {
+                color: #00adb5;
+                font-size: 16px;
+                font-weight: 600;
+            }
+
+            QComboBox {
+                background-color: #2b2b3c; 
+                color: #ffffff; 
+                border: 1px solid #5a5f66; 
+                padding: 4px;
+            }
+
+            QComboBox:focus {
+                border: 1px solid #00adb5;
+            }
+
+            QComboBox QAbstractItemView {
+                background-color: #1e1e2d; 
+                selection-background-color: #323544; 
+                color: #ffffff;
+            }
+
+            QDateEdit {
+                background-color: #2b2b3c; 
+                color: #ffffff; 
+                border: 1px solid #5a5f66;
+                padding: 4px;
+            }
+
+            QDateEdit:focus {
+                border: 1px solid #00adb5;
+            }
+
+            QPushButton {
+                background-color: #00adb5; 
+                color: #ffffff; 
+                border-radius: 5px; 
+                padding: 8px 12px; 
+                font-weight: bold;
+            }
+
+            QPushButton:hover {
+                background-color: #007f8b;
+            }
+
+            QTextEdit {
+                background-color: #2b2b3c; 
+                color: #ffffff; 
+                border: 1px solid #5a5f66;
+                font-size: 14px;
+            }
+
+            QMessageBox {
+                background-color: #1e1e2d;
+                color: #c4c4c4;
+            }
+        """)
+
     def generate_report(self):
         report_type = self.report_type_combo.currentText()
         start_date = self.start_date_edit.date().toPyDate()
@@ -93,11 +166,17 @@ class Reports(QWidget):
         ax = self.canvas.figure.add_subplot(111)
         products = list(data.keys())
         sales = list(data.values())
-        ax.bar(products, sales, color='skyblue')
-        ax.set_title(title)
-        ax.set_xlabel(xlabel)
-        ax.set_ylabel(ylabel)
-        ax.tick_params(axis='x', rotation=45)
+        # Applying chart colors as per guidelines
+        ax.bar(products, sales, color='#00adb5')
+        ax.set_title(title, color='#00adb5')
+        ax.set_xlabel(xlabel, color='#c4c4c4')
+        ax.set_ylabel(ylabel, color='#c4c4c4')
+        ax.spines['bottom'].set_color('#5a5f66')
+        ax.spines['left'].set_color('#5a5f66')
+        ax.xaxis.label.set_color('#c4c4c4')
+        ax.yaxis.label.set_color('#c4c4c4')
+        ax.tick_params(axis='x', colors='#c4c4c4', rotation=45)
+        ax.tick_params(axis='y', colors='#c4c4c4')
         self.canvas.draw()
     
     def plot_pie_chart(self, data: Dict[str, float], title: str):
@@ -105,7 +184,12 @@ class Reports(QWidget):
         ax = self.canvas.figure.add_subplot(111)
         labels = list(data.keys())
         sizes = list(data.values())
-        ax.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=140)
+        # For pie chart, let's maintain consistency with the theme:
+        # Using teal accent for slices
+        colors = ['#00adb5', '#f8c471', '#e74c3c', '#5a5f66', '#c4c4c4']
+        # Cycle colors if less than needed
+        colors = (colors * ((len(sizes)//len(colors))+1))[:len(sizes)]
+        ax.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=140, colors=colors, textprops={'color':'#ffffff'})
         ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
-        ax.set_title(title)
+        ax.set_title(title, color='#00adb5')
         self.canvas.draw()
