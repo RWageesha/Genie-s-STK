@@ -1,108 +1,234 @@
+# UI/main_window.py
+
 import sys
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-    QPushButton, QListWidget, QMessageBox
+    QPushButton, QFrame, QStackedWidget, QLabel, QDialog, QTextEdit, QVBoxLayout
 )
-from PyQt5.QtCore import Qt
+from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import Qt, QSize
 
-from .add_product_dialog import AddProductDialog
-from .add_batch_dialog import AddBatchDialog
-from .sell_product_dialog import SellProductDialog
+from .products_management import ProductsManagement
+from .batches_management import BatchesManagement
+from .sales_management import SalesManagement
+from .suppliers_management import SuppliersManagement
+from .orders_management import OrdersManagement
+from .reports import Reports
+from .settings import Settings  # Ensure this module exists and is correctly implemented
 
-class MainWindow(QMainWindow):
+class ContactDialog(QDialog):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Contact Us")
+        self.setFixedSize(400, 300)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #ffffff;
+            }
+            QLabel {
+                font-size: 14px;
+            }
+        """)
+
+        layout = QVBoxLayout()
+
+        contact_info = QLabel(
+            "For support, contact us at:\n\n"
+            "Email: support@pharmacy.com\n"
+            "Phone: +1 (234) 567-8901\n"
+            "Address: 123 Pharmacy St., Health City, HC 45678"
+        )
+        contact_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(contact_info)
+
+        self.setLayout(layout)
+
+class ModernSidebarUI(QMainWindow):
     def __init__(self, inventory_service):
         super().__init__()
+
         self.inventory_service = inventory_service
+
         self.setWindowTitle("Pharmacy Inventory Management")
-        
-        # Main widget and layout
-        central_widget = QWidget(self)
-        self.setCentralWidget(central_widget)
-        main_layout = QVBoxLayout(central_widget)
-        
-        # Product list
-        self.product_list = QListWidget()
-        main_layout.addWidget(self.product_list)
-        
-        # Load products
-        self.load_products()
-        
-        # Buttons layout
-        btn_layout = QHBoxLayout()
-        
-        self.add_product_btn = QPushButton("Add Product")
-        self.add_product_btn.clicked.connect(self.add_product)
-        btn_layout.addWidget(self.add_product_btn)
-        
-        self.add_batch_btn = QPushButton("Add Batch")
-        self.add_batch_btn.clicked.connect(self.add_batch)
-        btn_layout.addWidget(self.add_batch_btn)
-        
-        self.sell_product_btn = QPushButton("Sell Product")
-        self.sell_product_btn.clicked.connect(self.sell_product)
-        btn_layout.addWidget(self.sell_product_btn)
+        self.setGeometry(100, 100, 1200, 700)
 
-        main_layout.addLayout(btn_layout)
-    
-    def load_products(self):
-        """Load products from the inventory_service into the product_list."""
-        self.product_list.clear()
-        # Assume inventory_service has all products loaded in memory
-        for product in self.inventory_service.inventory.products:
-            self.product_list.addItem(f"{product.product_id}: {product.sku} - {product.name}")
-    
-    def get_selected_product_id(self):
-        current_item = self.product_list.currentItem()
-        if not current_item:
-            return None
-        # Format: "product_id: sku - name"
-        text = current_item.text()
-        product_id_str = text.split(":")[0]
-        return int(product_id_str)
-    
-    def add_product(self):
-        dialog = AddProductDialog(self)
-        if dialog.exec_() == dialog.Accepted:
-            product = dialog.get_product_data()
-            try:
-                saved_product = self.inventory_service.add_product(product)
-                QMessageBox.information(self, "Success", f"Product Added: {saved_product.name}")
-                self.load_products()
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to add product: {e}")
-    
-    def add_batch(self):
-        product_id = self.get_selected_product_id()
-        if product_id is None:
-            QMessageBox.warning(self, "No Product Selected", "Please select a product first.")
-            return
-        
-        dialog = AddBatchDialog(self)
-        if dialog.exec_() == dialog.Accepted:
-            batch = dialog.get_batch_data(product_id)
-            try:
-                saved_batch = self.inventory_service.add_batch(batch)
-                QMessageBox.information(self, "Success", f"Batch Added. Quantity: {saved_batch.quantity}")
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to add batch: {e}")
-    
-    def sell_product(self):
-        product_id = self.get_selected_product_id()
-        if product_id is None:
-            QMessageBox.warning(self, "No Product Selected", "Please select a product first.")
-            return
-        
-        dialog = SellProductDialog(self)
-        if dialog.exec_() == dialog.Accepted:
-            quantity = dialog.get_quantity()
-            try:
-                sale_record = self.inventory_service.sell_product(product_id, quantity)
-                QMessageBox.information(self, "Success", f"Sale Recorded. Sold {quantity} units.")
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to sell product: {e}")
+        # Central Widget
+        self.central_widget = QWidget()
+        self.central_widget.setStyleSheet("background-color: #f4f4f4;")
+        self.setCentralWidget(self.central_widget)
 
+        # Main Layout
+        main_layout = QHBoxLayout(self.central_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # Left Sidebar
+        sidebar = QFrame()
+        sidebar.setFixedWidth(250)
+        sidebar.setStyleSheet("""
+            QFrame {
+                background-color: #1e1e2d;
+                border-right: 1px solid #2b2b3c;
+            }
+            QPushButton {
+                background-color: transparent;
+                color: #ffffff;
+                text-align: left;
+                padding: 10px 20px;
+                border: none;
+                font-size: 14px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background-color: #2b2b3c;
+                border-left: 3px solid #00adb5;
+                color: #00adb5;
+            }
+            QPushButton:checked {
+                background-color: #2b2b3c;
+                border-left: 3px solid #00adb5;
+                color: #00adb5;
+            }
+        """)
+        sidebar_layout = QVBoxLayout(sidebar)
+        sidebar_layout.setContentsMargins(0, 0, 0, 0)
+        sidebar_layout.setSpacing(10)
+
+        # Initialize Buttons
+        self.buttons = {}
+        self.init_sidebar_buttons(sidebar_layout)
+
+        # Spacer to push items to the bottom
+        sidebar_layout.addStretch()
+
+        # Bottom Buttons
+        self.init_bottom_buttons(sidebar_layout)
+
+        # Add Sidebar to Main Layout
+        main_layout.addWidget(sidebar)
+
+        # Main Content Area
+        self.stack = QStackedWidget()
+        self.stack.setStyleSheet("""
+            QStackedWidget {
+                background-color: #ffffff;
+            }
+        """)
+
+        # Initialize Modules
+        self.init_modules()
+
+        # Add Stacked Widget to Main Layout
+        main_layout.addWidget(self.stack)
+
+        # Connect Buttons to Slots
+        self.connect_buttons()
+
+        # Set Home as the default selected button
+        self.buttons["Home"].setChecked(True)
+        self.stack.setCurrentIndex(0)
+
+    def init_sidebar_buttons(self, layout):
+        # Define button labels and corresponding icons
+        button_info = [
+            ("Home", "icons/home.svg"),
+            ("Product Management", "icons/product.svg"),
+            ("Batch Management", "icons/batch.svg"),
+            ("Sales Management", "icons/sales.svg"),
+            ("Reports", "icons/reports.svg"),
+        ]
+
+        for label, icon_path in button_info:
+            btn = QPushButton(f"  {label}")
+            btn.setFixedHeight(40)
+            btn.setIcon(QIcon(icon_path))
+            btn.setIconSize(QSize(20, 20))
+            btn.setCheckable(True)
+            btn.setStyleSheet("QPushButton { text-align: left; }")
+            layout.addWidget(btn)
+            self.buttons[label] = btn
+
+    def init_bottom_buttons(self, layout):
+        # Define bottom button labels and icons
+        bottom_button_info = [
+            ("Settings", "icons/settings.svg"),
+            ("Contact", "icons/contact.svg"),
+        ]
+
+        for label, icon_path in bottom_button_info:
+            btn = QPushButton(f"  {label}")
+            btn.setFixedHeight(40)
+            btn.setIcon(QIcon(icon_path))
+            btn.setIconSize(QSize(20, 20))
+            btn.setCheckable(False)
+            btn.setStyleSheet("QPushButton { text-align: left; }")
+            layout.addWidget(btn)
+            # Connect buttons to respective slots
+            if label == "Settings":
+                btn.clicked.connect(self.open_settings)
+            elif label == "Contact":
+                btn.clicked.connect(self.open_contact)
+
+    def init_modules(self):
+        # Initialize each module and add to the stacked widget
+        self.home_page = QLabel("Welcome to the Pharmacy Inventory Management System!")
+        self.home_page.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.home_page.setStyleSheet("font-size: 24px;")
+
+        self.products_management = ProductsManagement(self.inventory_service)
+        self.batches_management = BatchesManagement(self.inventory_service)
+        self.sales_management = SalesManagement(self.inventory_service)
+        self.reports = Reports(self.inventory_service)
+        self.settings_page = Settings(self.inventory_service)  # Assuming Settings module exists
+
+        # Add widgets to the stack in the same order as buttons
+        self.stack.addWidget(self.home_page)               # Index 0
+        self.stack.addWidget(self.products_management)     # Index 1
+        self.stack.addWidget(self.batches_management)      # Index 2
+        self.stack.addWidget(self.sales_management)        # Index 3
+        self.stack.addWidget(self.reports)                 # Index 4
+        self.stack.addWidget(self.settings_page)           # Index 5 (for Settings)
+
+    def connect_buttons(self):
+        # Connect each button to change the stacked widget
+        self.buttons["Home"].clicked.connect(lambda: self.switch_page(0))
+        self.buttons["Product Management"].clicked.connect(lambda: self.switch_page(1))
+        self.buttons["Batch Management"].clicked.connect(lambda: self.switch_page(2))
+        self.buttons["Sales Management"].clicked.connect(lambda: self.switch_page(3))
+        self.buttons["Reports"].clicked.connect(lambda: self.switch_page(4))
+
+        # Ensure only one button is checked at a time
+        for label, btn in self.buttons.items():
+            if label != "Home":  # Home is set as default
+                btn.setAutoExclusive(False)
+                btn.clicked.connect(self.update_button_states)
+
+    def switch_page(self, index):
+        self.stack.setCurrentIndex(index)
+
+    def update_button_states(self):
+        # Uncheck all buttons except the one clicked
+        for label, btn in self.buttons.items():
+            if btn.isChecked():
+                for other_label, other_btn in self.buttons.items():
+                    if other_btn != btn:
+                        other_btn.setChecked(False)
+
+    def open_settings(self):
+        # Check if Settings page is already in the stack
+        settings_index = self.stack.indexOf(self.settings_page)
+        if settings_index == -1:
+            self.settings_page = Settings(self.inventory_service)
+            self.stack.addWidget(self.settings_page)
+        self.stack.setCurrentWidget(self.settings_page)
+
+    def open_contact(self):
+        contact_dialog = ContactDialog()
+        contact_dialog.exec()
+
+# Run the App
 def run_app(inventory_service):
     app = QApplication(sys.argv)
-    window = MainWindow(inventory_service)
+    window = ModernSidebarUI(inventory_service)
     window.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())

@@ -1,25 +1,29 @@
-# test_connection.py
+# test/test_connections.py
 
-import psycopg2
-from psycopg2 import OperationalError
+import unittest
+from data.db_config import engine
+from data.models import Base
+from sqlalchemy import inspect
 
-def test_connection(url):
-    try:
-        conn = psycopg2.connect(url)
-        cursor = conn.cursor()
-        cursor.execute("SELECT version();")
-        db_version = cursor.fetchone()
-        print("PostgreSQL Database Version:", db_version)
-        cursor.close()
-        conn.close()
-        return True
-    except OperationalError as e:
-        print(f"Connection failed: {e}")
-        return False
+class TestDatabaseConnection(unittest.TestCase):
+    def setUp(self):
+        # Create tables
+        Base.metadata.create_all(bind=engine)
 
-if __name__ == "__main__":
-    connection_url = "postgresql://postgres:pass@localhost:5432/pharmacy_db"
-    if test_connection(connection_url):
-        print("PostgreSQL is working and accessible.")
-    else:
-        print("Failed to connect to PostgreSQL.")
+    def tearDown(self):
+        # Drop tables
+        Base.metadata.drop_all(bind=engine)
+
+    def test_database_connection(self):
+        # Test if tables are created
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        self.assertIn("products", tables)
+        self.assertIn("batches", tables)
+        self.assertIn("sale_records", tables)
+        self.assertIn("suppliers", tables)
+        self.assertIn("orders", tables)
+        self.assertIn("order_items", tables)
+
+if __name__ == '__main__':
+    unittest.main()

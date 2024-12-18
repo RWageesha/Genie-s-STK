@@ -1,191 +1,136 @@
 # services/inventory_service.py
 
-from contextlib import contextmanager
-from typing import List, Optional, Dict
+from typing import List, Optional
+from domain.domain_models import Product, Batch, SaleRecord, Supplier, Order, SalesReport
+from data.repositories import ProductRepository, BatchRepository, SaleRecordRepository, SupplierRepository, OrderRepository
 from datetime import date
-from collections import defaultdict
-
-from sqlalchemy.orm import Session
-
-from domain.domain_models import Product, Batch, SaleRecord, SalesReport
-from domain.inventory import Inventory
-from data.repositories import ProductRepository, BatchRepository, SaleRecordRepository
-
 
 class InventoryService:
-    def __init__(self, 
-                 product_repo: ProductRepository, 
-                 batch_repo: BatchRepository, 
-                 sale_repo: SaleRecordRepository):
+    def __init__(self, product_repo: ProductRepository, batch_repo: BatchRepository,
+                 sale_repo: SaleRecordRepository, supplier_repo: SupplierRepository,
+                 order_repo: OrderRepository):
         self.product_repo = product_repo
         self.batch_repo = batch_repo
         self.sale_repo = sale_repo
+        self.supplier_repo = supplier_repo
+        self.order_repo = order_repo
 
-        # Initialize Inventory from database data
-        products = self.product_repo.get_all_products()
-        batches = self.batch_repo.get_all_batches()
-        self.inventory = Inventory(products=products, batches=batches)
+    # Product Management
+    def get_all_products(self) -> List[Product]:
+        return self.product_repo.get_all_products()
 
-    # Product Operations
+    def get_product_by_id(self, product_id: int) -> Optional[Product]:
+        return self.product_repo.get_product_by_id(product_id)
+
     def add_product(self, product: Product) -> Product:
-        # Ensure SKU is unique
-        existing = self.product_repo.get_product_by_sku(product.sku)
-        if existing:
-            raise ValueError(f"Product with SKU '{product.sku}' already exists.")
+        return self.product_repo.add_product(product)
 
-        saved_product = self.product_repo.add_product(product)
-        self.inventory.add_product(saved_product)
-        return saved_product
-
-    def update_product(self, product_id: int, **kwargs) -> Optional[Product]:
-        product = self.product_repo.get_product_by_id(product_id)
-        if not product:
-            raise ValueError(f"Product with ID {product_id} does not exist.")
-
-        if 'sku' in kwargs:
-            # Check if new SKU conflicts with another product
-            new_sku = kwargs['sku']
-            other_product = self.product_repo.get_product_by_sku(new_sku)
-            if other_product and other_product.product_id != product_id:
-                raise ValueError(f"Another product with SKU '{new_sku}' already exists.")
-
-        for key, value in kwargs.items():
-            if hasattr(product, key):
-                setattr(product, key, value)
-            else:
-                raise AttributeError(f"Product has no attribute '{key}'.")
-
+    def update_product(self, product: Product) -> None:
         self.product_repo.update_product(product)
-
-        # Update in-memory inventory
-        inventory_product = next((p for p in self.inventory.products if p.product_id == product_id), None)
-        if inventory_product:
-            for key, value in kwargs.items():
-                setattr(inventory_product, key, value)
-        return product
 
     def delete_product(self, product_id: int) -> None:
         self.product_repo.delete_product(product_id)
-        self.inventory.delete_product(product_id)
 
-    def search_product_by_sku(self, sku: str) -> Optional[Product]:
-        # Quick lookup in memory
-        found_product = self.inventory.search_product_by_sku(sku)
-        if found_product:
-            return found_product
-        # If not found in memory (unlikely if inventory is always synced), try repository
-        return self.product_repo.get_product_by_sku(sku)
+    # Batch Management
+    def get_all_batches(self) -> List[Batch]:
+        return self.batch_repo.get_all_batches()
 
-    # Batch Operations
+    def get_batch_by_id(self, batch_id: int) -> Optional[Batch]:
+        return self.batch_repo.get_batch_by_id(batch_id)
+
     def add_batch(self, batch: Batch) -> Batch:
-        # Ensure the product exists
-        product = self.product_repo.get_product_by_id(batch.product_id)
-        if not product:
-            raise ValueError(f"Product with ID {batch.product_id} does not exist.")
+        return self.batch_repo.add_batch(batch)
 
-        saved_batch = self.batch_repo.add_batch(batch)
-        self.inventory.add_batch(saved_batch)
-        return saved_batch
-
-    def update_batch(self, batch_id: int, **kwargs) -> Optional[Batch]:
-        batch = self.batch_repo.get_batch_by_id(batch_id)
-        if not batch:
-            raise ValueError(f"Batch with ID {batch_id} does not exist.")
-
-        for key, value in kwargs.items():
-            if hasattr(batch, key):
-                setattr(batch, key, value)
-            else:
-                raise AttributeError(f"Batch has no attribute '{key}'.")
-
+    def update_batch(self, batch: Batch) -> None:
         self.batch_repo.update_batch(batch)
-
-        # Update in-memory inventory
-        inventory_batch = next((b for b in self.inventory.batches if b.batch_id == batch_id), None)
-        if inventory_batch:
-            for key, value in kwargs.items():
-                setattr(inventory_batch, key, value)
-        return batch
 
     def delete_batch(self, batch_id: int) -> None:
         self.batch_repo.delete_batch(batch_id)
-        self.inventory.delete_batch(batch_id)
 
-    # Stock Level Tracking
-    def get_stock_level(self, product_id: int) -> int:
-        return self.inventory.get_stock_level(product_id)
+    # Supplier Management
+    def get_all_suppliers(self) -> List[Supplier]:
+        return self.supplier_repo.get_all_suppliers()
 
-    # Selling Products 
-    def sell_product(self, product_id: int, quantity: int) -> SaleRecord:
-        if quantity <= 0:
-            raise ValueError("Quantity to sell must be positive.")
+    def get_supplier_by_id(self, supplier_id: int) -> Optional[Supplier]:
+        return self.supplier_repo.get_supplier_by_id(supplier_id)
 
-        product = self.product_repo.get_product_by_id(product_id)
-        if not product:
-            raise ValueError(f"Product with ID {product_id} does not exist.")
+    def add_supplier(self, supplier: Supplier) -> Supplier:
+        return self.supplier_repo.add_supplier(supplier)
 
-        # Check if enough stock is available
-        current_stock = self.get_stock_level(product_id)
-        if current_stock < quantity:
-            raise ValueError(f"Insufficient stock for product ID {product_id}. Available: {current_stock}, Requested: {quantity}")
+    def update_supplier(self, supplier: Supplier) -> None:
+        self.supplier_repo.update_supplier(supplier)
 
-        # Reduce stock in Inventory
-        self.inventory.reduce_stock(product_id, quantity)
+    def delete_supplier(self, supplier_id: int) -> None:
+        self.supplier_repo.delete_supplier(supplier_id)
 
-        # Update batches in the repository
-        for batch in self.inventory.batches:
-            if batch.product_id == product_id:
-                self.batch_repo.update_batch(batch)
+    # Order Management
+    def get_all_orders(self) -> List[Order]:
+        return self.order_repo.get_all_orders()
 
-        # Record the sale
-        sale_record = SaleRecord(
-            sale_id=None,  # Will be set by the repository
-            product_id=product_id,
-            quantity_sold=quantity,
-            sale_date=date.today(),
-            unit_price_at_sale=product.unit_price
+    def get_order_by_id(self, order_id: int) -> Optional[Order]:
+        return self.order_repo.get_order_by_id(order_id)
+
+    def add_order(self, order: Order) -> Order:
+        return self.order_repo.add_order(order)
+
+    def update_order(self, order: Order) -> None:
+        self.order_repo.update_order(order)
+
+    def delete_order(self, order_id: int) -> None:
+        self.order_repo.delete_order(order_id)
+
+    # Sales Management
+    def get_all_sales(self) -> List[SaleRecord]:
+        return self.sale_repo.get_all_sales()
+
+    def get_sale_by_id(self, sale_id: int) -> Optional[SaleRecord]:
+        return self.sale_repo.get_sale_by_id(sale_id)
+
+    def record_sale(self, sale: SaleRecord) -> SaleRecord:
+        # Decrement the product quantity from batches (FIFO)
+        batches = sorted(
+            self.batch_repo.get_all_batches(),
+            key=lambda b: b.manufacture_date
         )
-        saved_sale = self.sale_repo.record_sale(sale_record)
+        quantity_to_sell = sale.quantity_sold
+        for batch in batches:
+            if batch.product_id == sale.product_id and batch.quantity >= quantity_to_sell:
+                batch.quantity -= quantity_to_sell
+                self.batch_repo.update_batch(batch)
+                break
+            elif batch.product_id == sale.product_id and batch.quantity > 0:
+                quantity_to_sell -= batch.quantity
+                batch.quantity = 0
+                self.batch_repo.update_batch(batch)
+        return self.sale_repo.record_sale(sale)
 
-        return saved_sale
-
-    # Reorder Management
-    def reorder_if_needed(self) -> List[Product]:
-        low_stock_products = [p for p in self.inventory.products if self._is_below_reorder(p)]
-        # Implement reordering logic here, e.g., create orders
-        # For simplicity, we'll just return the list of products to reorder
-        return low_stock_products
-
-    def _is_below_reorder(self, product: Product) -> bool:
-        total_quantity = self.get_stock_level(product.product_id)
-        return total_quantity <= product.reorder_level
-
-    @contextmanager
-    def session_scope(self):
-        """Provide a transactional scope around a series of operations."""
-        session: Session = self.product_repo.session
-        try:
-            yield
-            session.commit()
-        except Exception:
-            session.rollback()
-            raise
-
-    def generate_sales_report(self, start_date: date, end_date: date) -> SalesReport:
+    # Reporting
+    def get_sales_report(self, start_date: date, end_date: date) -> SalesReport:
         sales = self.sale_repo.get_sales_between_dates(start_date, end_date)
-        report_data = defaultdict(float)
-
+        total_sales = sum(sale.quantity_sold * sale.unit_price_at_sale for sale in sales)
+        sales_by_product = {}
         for sale in sales:
-            report_data[sale.product_id] += sale.quantity_sold * sale.unit_price_at_sale
-
-        # Map product IDs to product names
-        products = {p.product_id: p.name for p in self.inventory.products}
-
-        sales_summary = {products.get(pid, "Unknown"): total for pid, total in report_data.items()}
-
+            product_name = sale.product.name if sale.product else "Unknown"
+            sales_by_product[product_name] = sales_by_product.get(product_name, 0) + sale.quantity_sold * sale.unit_price_at_sale
         return SalesReport(
             start_date=start_date,
             end_date=end_date,
-            total_sales=sum(sales_summary.values()),
-            sales_by_product=sales_summary
+            total_sales=total_sales,
+            sales_by_product=sales_by_product
         )
+
+    def get_inventory_status(self) -> List[Product]:
+        products = self.product_repo.get_all_products()
+        for product in products:
+            total_quantity = self.batch_repo.get_available_quantity(product.product_id)
+            product.total_quantity = total_quantity
+        return products
+
+    # Database Configuration
+    def get_db_url(self) -> str:
+        return self.batch_repo.session.bind.url.render_as_string(hide_password=True)
+
+    def update_db_url(self, new_db_url: str) -> None:
+        # Implement logic to update the database URL and reinitialize connections if necessary
+        # This is a placeholder implementation
+        raise NotImplementedError("Dynamic DB URL update not supported.")
