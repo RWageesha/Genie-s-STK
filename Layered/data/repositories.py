@@ -57,17 +57,17 @@ class SaleRecordRepository(ABC):
         pass
 
     @abstractmethod
-    def get_sale_by_id(self, sale_id: int) -> Optional[SaleRecord]:
+    def get_sale_by_id(self, sale_id: int) -> SaleRecord:
         pass
 
     @abstractmethod
-    def record_sale(self, sale_record: SaleRecord) -> SaleRecord:
+    def record_sale(self, sale_record: dict) -> SaleRecord:
         pass
 
     @abstractmethod
     def get_sales_between_dates(self, start_date: date, end_date: date) -> List[SaleRecord]:
         pass
-
+    
 class SupplierRepository(ABC):
     @abstractmethod
     def get_all_suppliers(self) -> List[Supplier]:

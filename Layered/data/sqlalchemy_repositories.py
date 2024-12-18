@@ -18,7 +18,7 @@ from data.models import (
 )
 from data.db_config import SessionLocal
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, asc
 from typing import List, Optional
 from domain.domain_models import (
     Product as DomainProduct,
@@ -29,8 +29,6 @@ from domain.domain_models import (
     OrderItem as DomainOrderItem
 )
 from datetime import date
-
-# Ensure all repository classes are defined below
 
 class SQLAlchemyProductRepository(ProductRepository):
     def __init__(self):
@@ -50,7 +48,6 @@ class SQLAlchemyProductRepository(ProductRepository):
         return self.to_domain_model(orm_product) if orm_product else None
 
     def add_product(self, product: DomainProduct) -> DomainProduct:
-        # Convert DomainProduct to ORMProduct
         orm_product = ORMProduct(
             sku=product.sku,
             name=product.name,
@@ -93,9 +90,8 @@ class SQLAlchemyProductRepository(ProductRepository):
             description=orm_product.description,
             unit_price=orm_product.unit_price,
             reorder_level=orm_product.reorder_level,
-            total_quantity=0  # This can be set separately if needed
+            # Assuming total_quantity is calculated elsewhere or added as needed
         )
-
 
 class SQLAlchemyBatchRepository(BatchRepository):
     def __init__(self):
@@ -152,7 +148,29 @@ class SQLAlchemyBatchRepository(BatchRepository):
             manufacture_date=orm_batch.manufacture_date,
             expiry_date=orm_batch.expiry_date
         )
-
+    
+    def reduce_quantity(self, product_id: int, quantity: int) -> None:
+        """
+        Reduces the quantity of a product across its batches.
+        Prioritizes batches with the earliest expiry dates.
+        """
+        remaining = quantity
+        # Fetch batches sorted by earliest expiry date
+        batches = self.session.query(ORMBatch).filter(ORMBatch.product_id == product_id).order_by(asc(ORMBatch.expiry_date)).all()
+        
+        for batch in batches:
+            if remaining <= 0:
+                break
+            if batch.quantity >= remaining:
+                batch.quantity -= remaining
+                remaining = 0
+            else:
+                remaining -= batch.quantity
+                batch.quantity = 0
+            self.session.commit()
+        
+        if remaining > 0:
+            raise ValueError("Insufficient stock to complete the sale.")
 
 class SQLAlchemySaleRecordRepository(SaleRecordRepository):
     def __init__(self):
@@ -163,25 +181,41 @@ class SQLAlchemySaleRecordRepository(SaleRecordRepository):
         domain_sales = [self.to_domain_model(s) for s in orm_sales]
         return domain_sales
 
-    def get_sale_by_id(self, sale_id: int) -> Optional[DomainSaleRecord]:
+    def get_sale_by_id(self, sale_id: int) -> DomainSaleRecord:
         orm_sale = self.session.query(ORMSaleRecord).filter(ORMSaleRecord.sale_id == sale_id).first()
         return self.to_domain_model(orm_sale) if orm_sale else None
 
-    def record_sale(self, sale_record: DomainSaleRecord) -> DomainSaleRecord:
+    def record_sale(self, sale_record: dict) -> DomainSaleRecord:
+        """
+        Records a sale in the database.
+
+        :param sale_record: Dictionary containing sale details.
+                            Expected keys: product_id, quantity_sold, sale_date, unit_price_at_sale
+        :return: Recorded SaleRecord instance.
+        """
         orm_sale = ORMSaleRecord(
-            product_id=sale_record.product_id,
-            quantity_sold=sale_record.quantity_sold,
-            sale_date=sale_record.sale_date,
-            unit_price_at_sale=sale_record.unit_price_at_sale
+            product_id=sale_record["product_id"],
+            quantity_sold=sale_record["quantity_sold"],
+            sale_date=sale_record["sale_date"],
+            unit_price_at_sale=sale_record["unit_price_at_sale"]
         )
         self.session.add(orm_sale)
         self.session.commit()
         self.session.refresh(orm_sale)
-        sale_record.sale_id = orm_sale.sale_id
-        return sale_record
+        return self.to_domain_model(orm_sale)
 
     def get_sales_between_dates(self, start_date: date, end_date: date) -> List[DomainSaleRecord]:
-        orm_sales = self.session.query(ORMSaleRecord).filter(ORMSaleRecord.sale_date.between(start_date, end_date)).all()
+        """
+        Retrieves all sales between the specified start and end dates.
+
+        :param start_date: Start date for the sales records.
+        :param end_date: End date for the sales records.
+        :return: List of SaleRecord instances within the date range.
+        """
+        orm_sales = self.session.query(ORMSaleRecord).filter(
+            ORMSaleRecord.sale_date >= start_date,
+            ORMSaleRecord.sale_date <= end_date
+        ).all()
         domain_sales = [self.to_domain_model(s) for s in orm_sales]
         return domain_sales
 
@@ -195,7 +229,6 @@ class SQLAlchemySaleRecordRepository(SaleRecordRepository):
             sale_date=orm_sale.sale_date,
             unit_price_at_sale=orm_sale.unit_price_at_sale
         )
-
 
 class SQLAlchemySupplierRepository(SupplierRepository):
     def __init__(self):

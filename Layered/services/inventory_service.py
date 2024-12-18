@@ -1,14 +1,33 @@
 # services/inventory_service.py
 
 from typing import List, Optional
-from domain.domain_models import Product, Batch, SaleRecord, Supplier, Order, SalesReport
-from data.repositories import ProductRepository, BatchRepository, SaleRecordRepository, SupplierRepository, OrderRepository
 from datetime import date
+from domain.domain_models import (
+    Product,
+    Batch,
+    SaleRecord,
+    Supplier,
+    Order,
+    OrderItem,
+    SalesReport
+)
+from data.repositories import (
+    ProductRepository,
+    BatchRepository,
+    SaleRecordRepository,
+    SupplierRepository,
+    OrderRepository
+)
 
 class InventoryService:
-    def __init__(self, product_repo: ProductRepository, batch_repo: BatchRepository,
-                 sale_repo: SaleRecordRepository, supplier_repo: SupplierRepository,
-                 order_repo: OrderRepository):
+    def __init__(
+        self,
+        product_repo: ProductRepository,
+        batch_repo: BatchRepository,
+        sale_repo: SaleRecordRepository,
+        supplier_repo: SupplierRepository,
+        order_repo: OrderRepository
+    ):
         self.product_repo = product_repo
         self.batch_repo = batch_repo
         self.sale_repo = sale_repo
@@ -103,6 +122,9 @@ class InventoryService:
                 batch.quantity = 0
                 self.batch_repo.update_batch(batch)
         return self.sale_repo.record_sale(sale)
+    
+    def get_available_quantity(self, product_id: int) -> int:
+        return self.batch_repo.get_available_quantity(product_id)
 
     # Reporting
     def get_sales_report(self, start_date: date, end_date: date) -> SalesReport:

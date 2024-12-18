@@ -3,7 +3,7 @@
 import sys
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-    QPushButton, QFrame, QStackedWidget, QLabel, QDialog, QTextEdit, QVBoxLayout
+    QPushButton, QFrame, QStackedWidget, QLabel, QDialog
 )
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt, QSize
@@ -15,6 +15,7 @@ from .suppliers_management import SuppliersManagement
 from .orders_management import OrdersManagement
 from .reports import Reports
 from .settings import Settings  # Ensure this module exists and is correctly implemented
+from .sell_product_widget import SellProductWidget  # Import the SellProductWidget
 
 class ContactDialog(QDialog):
     def __init__(self):
@@ -171,9 +172,7 @@ class ModernSidebarUI(QMainWindow):
 
     def init_modules(self):
         # Initialize each module and add to the stacked widget
-        self.home_page = QLabel("Welcome to the Pharmacy Inventory Management System!")
-        self.home_page.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.home_page.setStyleSheet("font-size: 24px;")
+        self.home_page = SellProductWidget(self.inventory_service)  # Updated to SellProductWidget
 
         self.products_management = ProductsManagement(self.inventory_service)
         self.batches_management = BatchesManagement(self.inventory_service)
@@ -182,7 +181,7 @@ class ModernSidebarUI(QMainWindow):
         self.settings_page = Settings(self.inventory_service)  # Assuming Settings module exists
 
         # Add widgets to the stack in the same order as buttons
-        self.stack.addWidget(self.home_page)               # Index 0
+        self.stack.addWidget(self.home_page)               # Index 0 (Home)
         self.stack.addWidget(self.products_management)     # Index 1
         self.stack.addWidget(self.batches_management)      # Index 2
         self.stack.addWidget(self.sales_management)        # Index 3
@@ -215,14 +214,11 @@ class ModernSidebarUI(QMainWindow):
                         other_btn.setChecked(False)
 
     def open_settings(self):
-        # Check if Settings page is already in the stack
-        settings_index = self.stack.indexOf(self.settings_page)
-        if settings_index == -1:
-            self.settings_page = Settings(self.inventory_service)
-            self.stack.addWidget(self.settings_page)
+        # Navigate to the Settings page
         self.stack.setCurrentWidget(self.settings_page)
 
     def open_contact(self):
+        # Open the Contact Dialog
         contact_dialog = ContactDialog()
         contact_dialog.exec()
 

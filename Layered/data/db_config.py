@@ -14,7 +14,6 @@ DATABASE_URL = "postgresql://postgres:123@localhost:5432/pharmacy_db"
 engine = create_engine(DATABASE_URL, echo=True, future=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
-
 def init_db():
     """
     Initialize the database by dropping all tables and recreating them.
@@ -26,8 +25,6 @@ def init_db():
     except Exception as e:
         logger.error(f"Error creating tables: {e}")
         raise e
-
-
 
 
 #"postgresql://postgres:pass@localhost:5432/pharmacy_db"
