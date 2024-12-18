@@ -1,9 +1,7 @@
-# UI/sell_product_widget.py
-
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
     QLineEdit, QPushButton, QTableWidget, QTableWidgetItem,
-    QMessageBox, QDialog, QDialogButtonBox, QTextEdit
+    QMessageBox, QDialog, QDialogButtonBox, QTextEdit, QHeaderView
 )
 from PyQt6.QtGui import QIntValidator, QFont
 from PyQt6.QtCore import Qt
@@ -15,6 +13,8 @@ from datetime import date
 
 import win32print
 import win32ui
+
+from PyQt6.QtGui import QKeySequence, QShortcut  # Add QShortcut import
 
 class BillDialog(QDialog):
     def __init__(self, bill_text: str, send_to_printer_callback):
@@ -92,6 +92,19 @@ class SellProductWidget(QWidget):
         self.inventory_service = inventory_service
         self.cart = []  # List to store cart items
         self.init_ui()
+        self.add_shortcuts()  # Add shortcut bindings
+
+    def add_shortcuts(self):
+        """
+        Add keyboard shortcuts for common actions.
+        """
+        # Shortcut for Add to Cart button (Enter key)
+        self.add_to_cart_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Return), self)
+        self.add_to_cart_shortcut.activated.connect(self.add_to_cart)
+
+        # Optionally, also bind the Enter key (numpad) for consistency
+        self.add_to_cart_shortcut_numpad = QShortcut(QKeySequence(Qt.Key.Key_Enter), self)
+        self.add_to_cart_shortcut_numpad.activated.connect(self.add_to_cart)
 
     def init_ui(self):
         main_layout = QVBoxLayout()
@@ -128,14 +141,18 @@ class SellProductWidget(QWidget):
         self.cart_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.cart_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.cart_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
-        self.cart_table.horizontalHeader().setStretchLastSection(True)
         self.cart_table.setAlternatingRowColors(True)  # For even/odd row color styling
+
+        # Configure header to make columns equal width
+        header = self.cart_table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+
         main_layout.addWidget(self.cart_table)
 
         # Total and Finalize Sale Layout
         finalize_layout = QHBoxLayout()
 
-        self.total_label = QLabel("Total: Rs0.00")
+        self.total_label = QLabel("Total: Rs 0.00")
         self.total_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
         finalize_button = QPushButton("Finalize Sale")
@@ -207,14 +224,13 @@ class SellProductWidget(QWidget):
             }
 
             QTableWidget {
-                background-color: #1e1e2d;
                 gridline-color: #5a5f66;
                 border: 1px solid #5a5f66;
                 font-size: 14px;
             }
 
-            QTableWidget::item {
-                color: #ffffff;
+            QTableWidget::item:alternate {
+                background-color: #2b2b3c;
             }
 
             QTableWidget::item:selected {
@@ -252,7 +268,6 @@ class SellProductWidget(QWidget):
             }
 
         """)
-
 
         self.total_label.setStyleSheet("color: #ffffff; font-size: 16px; font-weight:bold;")
     
@@ -332,7 +347,7 @@ class SellProductWidget(QWidget):
         Sends the given text directly to the thermal printer.
         """
         CUT_COMMAND = "\x1D\x56\x42\x00"
-        FEED_LINES = "\n" * 12
+        FEED_LINES = "\n" * 2
         bill_text += FEED_LINES + CUT_COMMAND
 
         printer_name = win32print.GetDefaultPrinter()
@@ -357,11 +372,11 @@ class SellProductWidget(QWidget):
         try:
             total = 0.0
             bill_lines = []
-            bill_lines.append("***** PHARMACY INVOICE *****\n")
+            bill_lines.append("\n      ***** PHARMACY INVOICE *****\n\n")
             bill_lines.append(f"Date: {date.today().strftime('%Y-%m-%d')}\n")
-            bill_lines.append("================================\n")
-            bill_lines.append(f"{'Product':25s}{'Qty':>5s}{'Unit Price':>15s}{'Total':>15s}\n")
-            bill_lines.append("--------------------------------\n")
+            bill_lines.append("------------------------------------------------\n")
+            bill_lines.append(f"{'Product':<20}{'Qty':>6}{'Price':>10}{'Total':>12}\n")
+            bill_lines.append("------------------------------------------------\n")
 
             for item in self.cart:
                 sale_record = SaleRecord(
@@ -375,21 +390,24 @@ class SellProductWidget(QWidget):
 
                 line_total = item["quantity"] * item["unit_price"]
                 total += line_total
+
+                # Truncate product name if too long
+                product_name = (item['product_name'][:18] + '..') if len(item['product_name']) > 18 else item['product_name']
+
+                # Format prices with two decimal places
                 unit_price_str = f"Rs{item['unit_price']:.2f}"
                 line_total_str = f"Rs{line_total:.2f}"
 
                 bill_lines.append(
-                    f"{item['product_name']:25s}"
-                    f"{item['quantity']:>5d}"
-                    f"{unit_price_str:>15s}"
-                    f"{line_total_str:>15s}\n"
+                    f"{product_name:<20}{item['quantity']:>6}{unit_price_str:>10}{line_total_str:>12}\n"
                 )
 
-            bill_lines.append("================================\n")
-            bill_lines.append(f"{'TOTAL':>45s}{f'Rs{total:.2f}':>15s}\n")
-            bill_lines.append("================================\n")
-            bill_lines.append("     Thank you for your purchase!\n")
-            bill_lines.append("     Visit again!\n")
+            bill_lines.append("------------------------------------------------\n")
+            bill_lines.append(f"{'TOTAL':>38}{f'Rs{total:.2f}':>10}\n")
+            bill_lines.append("------------------------------------------------\n")
+            bill_lines.append("\n          Thank you for your purchase!\n")
+            bill_lines.append("              Visit again!\n")
+            bill_lines.append("------------------------------------------------\n")
 
             bill_text = "".join(bill_lines)
 

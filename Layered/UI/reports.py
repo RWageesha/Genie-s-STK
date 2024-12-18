@@ -131,65 +131,134 @@ class Reports(QWidget):
         report_type = self.report_type_combo.currentText()
         start_date = self.start_date_edit.date().toPyDate()
         end_date = self.end_date_edit.date().toPyDate()
-        
+
         if start_date > end_date:
             QMessageBox.warning(self, "Invalid Dates", "Start date must be before end date.")
             return
-        
+
         if report_type == "Sales Report":
             sales_report = self.inventory_service.get_sales_report(start_date, end_date)
             report_text = f"Sales Report from {sales_report.start_date} to {sales_report.end_date}\n"
             report_text += f"Total Sales: {sales_report.total_sales:.2f}\n\n"
             report_text += "Detailed Sales:\n"
+
+            sales_by_product = {}  # Collect sales by product
+
             for sale in self.inventory_service.get_all_sales():
                 if start_date <= sale.sale_date <= end_date:
-                    report_text += f"Sale ID: {sale.sale_id}, Product: {sale.product.name if sale.product else ''}, Quantity: {sale.quantity_sold}, Date: {sale.sale_date}, Unit Price: {sale.unit_price_at_sale}\n"
+                    product_name = sale.product.name if sale.product and sale.product.name else "Unnamed Product"
+                    report_text += (
+                        f"Sale ID: {sale.sale_id}, "
+                        f"Product: {product_name}, "
+                        f"Quantity: {sale.quantity_sold}, "
+                        f"Date: {sale.sale_date}, "
+                        f"Unit Price: {sale.unit_price_at_sale}\n"
+                    )
+
+                    # Accumulate sales amount by product
+                    if product_name not in sales_by_product:
+                        sales_by_product[product_name] = 0.0
+                    sales_by_product[product_name] += sale.quantity_sold * sale.unit_price_at_sale
+
             self.report_display.setText(report_text)
-            
-            # Plot sales by product
-            self.plot_bar_chart(sales_report.sales_by_product, "Sales by Product", "Product", "Sales Amount")
-        
+
+            # Plot the bar chart with valid data
+            if sales_by_product:
+                self.plot_bar_chart(sales_by_product, "Sales by Product", "Product", "Sales Amount")
+            else:
+                QMessageBox.warning(self, "No Sales Data", "No sales data available for the selected dates.")
+
         elif report_type == "Inventory Status":
             inventory = self.inventory_service.get_inventory_status()
             report_text = f"Inventory Status as of {end_date}\n\n"
             report_text += "Products:\n"
+
+            inventory_distribution = {}
             for product in inventory:
-                report_text += f"Product ID: {product.product_id}, SKU: {product.sku}, Name: {product.name}, Quantity: {product.total_quantity}, Reorder Level: {product.reorder_level}\n"
+                product_name = product.name if product.name else "Unnamed Product"
+                report_text += (
+                    f"Product ID: {product.product_id}, "
+                    f"SKU: {product.sku}, "
+                    f"Name: {product_name}, "
+                    f"Quantity: {product.total_quantity}, "
+                    f"Reorder Level: {product.reorder_level}\n"
+                )
+                inventory_distribution[product_name] = product.total_quantity
+
             self.report_display.setText(report_text)
-            
-            # Plot inventory distribution
-            inventory_distribution = {product.name: product.total_quantity for product in inventory}
             self.plot_pie_chart(inventory_distribution, "Inventory Distribution")
+
     
     def plot_bar_chart(self, data: Dict[str, float], title: str, xlabel: str, ylabel: str):
         self.canvas.figure.clear()
         ax = self.canvas.figure.add_subplot(111)
+
+        # Extract data
         products = list(data.keys())
         sales = list(data.values())
-        # Applying chart colors as per guidelines
-        ax.bar(products, sales, color='#00adb5')
-        ax.set_title(title, color='#00adb5')
-        ax.set_xlabel(xlabel, color='#c4c4c4')
-        ax.set_ylabel(ylabel, color='#c4c4c4')
-        ax.spines['bottom'].set_color('#5a5f66')
-        ax.spines['left'].set_color('#5a5f66')
-        ax.xaxis.label.set_color('#c4c4c4')
-        ax.yaxis.label.set_color('#c4c4c4')
-        ax.tick_params(axis='x', colors='#c4c4c4', rotation=45)
-        ax.tick_params(axis='y', colors='#c4c4c4')
+
+        # If product names are missing, replace them with placeholders
+        products = [p if p else "Unknown Product" for p in products]
+
+        # Plot the bar chart
+        bars = ax.bar(products, sales, color='#00adb5', edgecolor='#323544')
+
+        # Customize the appearance
+        ax.set_facecolor('#1e1e2d')  # Set plot background to match theme
+        ax.set_title(title, color='#00adb5', fontsize=16, pad=15)
+        ax.set_xlabel(xlabel, color='#c4c4c4', fontsize=12)
+        ax.set_ylabel(ylabel, color='#c4c4c4', fontsize=12)
+
+        # Adjust X-axis ticks for better readability
+        ax.set_xticks(range(len(products)))
+        ax.set_xticklabels(products, rotation=45, ha="right", fontsize=10, color='#c4c4c4')
+
+        # Add grid lines on Y-axis for clarity
+        ax.grid(axis='y', linestyle='--', linewidth=0.7, color='#5a5f66')
+
+        # Annotate each bar with values
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(
+                bar.get_x() + bar.get_width() / 2, height + 500,  # Adjust Y offset
+                f"{height:.0f}", ha='center', va='bottom', color='#ffffff', fontsize=10
+            )
+
+        # Adjust the layout
+        self.canvas.figure.tight_layout(pad=2.0)
         self.canvas.draw()
+
     
     def plot_pie_chart(self, data: Dict[str, float], title: str):
         self.canvas.figure.clear()
+
+        # Explicitly set a larger figure size
+        self.canvas.figure.set_size_inches(6, 6)  # Adjust size (width, height)
+
         ax = self.canvas.figure.add_subplot(111)
+
         labels = list(data.keys())
         sizes = list(data.values())
-        # For pie chart, let's maintain consistency with the theme:
-        # Using teal accent for slices
+
+        # Define colors for consistency
         colors = ['#00adb5', '#f8c471', '#e74c3c', '#5a5f66', '#c4c4c4']
-        # Cycle colors if less than needed
-        colors = (colors * ((len(sizes)//len(colors))+1))[:len(sizes)]
-        ax.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=140, colors=colors, textprops={'color':'#ffffff'})
-        ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
-        ax.set_title(title, color='#00adb5')
+        colors = (colors * ((len(sizes) // len(colors)) + 1))[:len(sizes)]
+
+        # Create the pie chart
+        wedges, texts, autotexts = ax.pie(
+            sizes,
+            labels=labels,
+            autopct='%1.1f%%',
+            startangle=140,
+            colors=colors,
+            textprops={'color': '#ffffff', 'fontsize': 10},
+            wedgeprops={'edgecolor': '#323544'}
+        )
+
+        # Adjust the chart's title and text properties
+        ax.set_title(title, color='#00adb5', fontsize=16, pad=15)
+
+        # Make the pie chart take up the full figure
+        ax.axis('equal')  # Equal aspect ratio ensures a perfect circle
+        self.canvas.figure.tight_layout(pad=1.5)  # Avoid clipping
         self.canvas.draw()
