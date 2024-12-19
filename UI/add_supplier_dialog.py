@@ -150,7 +150,7 @@ class AddSupplierDialog(QDialog):
 
     def validate_email(self, email: str) -> bool:
         import re
-        email_regex = r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)"
+        email_regex = r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+Rs.)"
         return re.match(email_regex, email) is not None
 
     def get_supplier_data(self) -> Supplier:

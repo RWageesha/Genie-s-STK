@@ -9,12 +9,13 @@ from PyQt6.QtPrintSupport import QPrintDialog, QPrinter
 
 from domain.domain_models import Product, SaleRecord
 from typing import List
-from datetime import date
+from datetime import date, datetime
 
 import win32print
 import win32ui
 
 from PyQt6.QtGui import QKeySequence, QShortcut  # Add QShortcut import
+
 
 class BillDialog(QDialog):
     def __init__(self, bill_text: str, send_to_printer_callback):
@@ -106,8 +107,26 @@ class SellProductWidget(QWidget):
         self.add_to_cart_shortcut_numpad = QShortcut(QKeySequence(Qt.Key.Key_Enter), self)
         self.add_to_cart_shortcut_numpad.activated.connect(self.add_to_cart)
 
+        # Shortcut for Delete Selected Item (Delete key)
+        self.delete_item_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Delete), self)
+        self.delete_item_shortcut.activated.connect(self.delete_item)
+
     def init_ui(self):
         main_layout = QVBoxLayout()
+
+        # Product Search Layout
+        search_layout = QHBoxLayout()
+        
+        search_label = QLabel("Search Product:")
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Enter product name or SKU")
+        self.search_input.setMinimumWidth(300)  # Increased width
+        self.search_input.textChanged.connect(self.filter_products)
+        
+        search_layout.addWidget(search_label)
+        search_layout.addWidget(self.search_input)
+        
+        main_layout.addLayout(search_layout)
 
         # Product Selection Layout
         product_layout = QHBoxLayout()
@@ -116,16 +135,18 @@ class SellProductWidget(QWidget):
         self.product_combo = QComboBox()
         self.load_products()
 
+        product_layout.addWidget(product_label)
+        product_layout.addWidget(self.product_combo)
+
         quantity_label = QLabel("Quantity:")
         self.quantity_input = QLineEdit()
         self.quantity_input.setPlaceholderText("Enter quantity")
         self.quantity_input.setValidator(QIntValidator(1, 1000000, self))
+        self.quantity_input.setFixedWidth(200)  # Increased width
 
         add_button = QPushButton("Add to Cart")
         add_button.clicked.connect(self.add_to_cart)
 
-        product_layout.addWidget(product_label)
-        product_layout.addWidget(self.product_combo)
         product_layout.addWidget(quantity_label)
         product_layout.addWidget(self.quantity_input)
         product_layout.addWidget(add_button)
@@ -148,6 +169,14 @@ class SellProductWidget(QWidget):
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
         main_layout.addWidget(self.cart_table)
+
+        # Delete Item Button
+        delete_layout = QHBoxLayout()
+        delete_layout.addStretch()
+        delete_button = QPushButton("Delete Selected Item")
+        delete_button.clicked.connect(self.delete_item)
+        delete_layout.addWidget(delete_button)
+        main_layout.addLayout(delete_layout)
 
         # Total and Finalize Sale Layout
         finalize_layout = QHBoxLayout()
@@ -276,13 +305,29 @@ class SellProductWidget(QWidget):
         Loads all products into the product_combo dropdown.
         """
         try:
-            products: List[Product] = self.inventory_service.get_all_products()
+            self.all_products: List[Product] = self.inventory_service.get_all_products()
             self.product_combo.clear()
-            for product in products:
+            for product in self.all_products:
                 display_text = f"{product.name} (SKU: {product.sku})"
                 self.product_combo.addItem(display_text, userData=product.product_id)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to load products: {str(e)}")
+
+    def filter_products(self, query: str):
+        """
+        Filters the products in the combo box based on the search query.
+        """
+        try:
+            # Fetch the latest products each time a search is performed
+            latest_products: List[Product] = self.inventory_service.get_all_products()
+            self.product_combo.clear()
+            for product in latest_products:
+                if query.lower() in product.name.lower() or query.lower() in product.sku.lower():
+                    display_text = f"{product.name} (SKU: {product.sku})"
+                    self.product_combo.addItem(display_text, userData=product.product_id)
+            self.all_products = latest_products  # Update the all_products list
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to filter products: {str(e)}")
 
     def add_to_cart(self):
         """
@@ -342,6 +387,29 @@ class SellProductWidget(QWidget):
 
         self.total_label.setText(f"Total: Rs{total:.2f}")
 
+    def delete_item(self):
+        """
+        Deletes the selected item from the cart.
+        """
+        selected_row = self.cart_table.currentRow()
+        if selected_row < 0:
+            QMessageBox.warning(self, "Selection Error", "Please select an item to delete.")
+            return
+
+        confirm = QMessageBox.question(
+            self,
+            "Confirm Deletion",
+            "Are you sure you want to delete the selected item?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+
+        if confirm == QMessageBox.StandardButton.Yes:
+            try:
+                del self.cart[selected_row]
+                self.update_cart_table()
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to delete item: {str(e)}")
+
     def _send_to_printer(self, bill_text: str):
         """
         Sends the given text directly to the thermal printer.
@@ -372,8 +440,9 @@ class SellProductWidget(QWidget):
         try:
             total = 0.0
             bill_lines = []
-            bill_lines.append("\n      ***** PHARMACY INVOICE *****\n\n")
-            bill_lines.append(f"Date: {date.today().strftime('%Y-%m-%d')}\n")
+            bill_lines.append("------------------------------------------------\n")
+            bill_lines.append("\n        ***** PHARMACY INVOICE *****\n\n")
+            bill_lines.append(f"Date: {date.today().strftime('%Y-%m-%d')}                  Time: {datetime.now().strftime('%H:%M:%S')}\n")
             bill_lines.append("------------------------------------------------\n")
             bill_lines.append(f"{'Product':<20}{'Qty':>6}{'Price':>10}{'Total':>12}\n")
             bill_lines.append("------------------------------------------------\n")
@@ -406,7 +475,9 @@ class SellProductWidget(QWidget):
             bill_lines.append(f"{'TOTAL':>38}{f'Rs{total:.2f}':>10}\n")
             bill_lines.append("------------------------------------------------\n")
             bill_lines.append("\n          Thank you for your purchase!\n")
-            bill_lines.append("              Visit again!\n")
+            bill_lines.append("                   Visit again!\n")
+            bill_lines.append("------------------------------------------------\n")
+            bill_lines.append("                     ClapTac \n")
             bill_lines.append("------------------------------------------------\n")
 
             bill_text = "".join(bill_lines)

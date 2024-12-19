@@ -173,7 +173,7 @@ class AddOrderDialog(QDialog):
         # Total Cost Display
         total_layout = QHBoxLayout()
         total_layout.addStretch()
-        self.total_label = QLabel("Total Cost: $0.00")
+        self.total_label = QLabel("Total Cost: Rs.0.00")
         self.total_label.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
         total_layout.addWidget(self.total_label)
         self.main_layout.addLayout(total_layout)
@@ -218,9 +218,9 @@ class AddOrderDialog(QDialog):
         self.items_table.insertRow(row_position)
         self.items_table.setItem(row_position, 0, QTableWidgetItem(order_item.product.name))
         self.items_table.setItem(row_position, 1, QTableWidgetItem(str(order_item.quantity)))
-        self.items_table.setItem(row_position, 2, QTableWidgetItem(f"${order_item.cost_per_unit:.2f}"))
+        self.items_table.setItem(row_position, 2, QTableWidgetItem(f"Rs.{order_item.cost_per_unit:.2f}"))
         total_cost = order_item.quantity * order_item.cost_per_unit
-        self.items_table.setItem(row_position, 3, QTableWidgetItem(f"${total_cost:.2f}"))
+        self.items_table.setItem(row_position, 3, QTableWidgetItem(f"Rs.{total_cost:.2f}"))
 
     def remove_item(self):
         """Remove the selected order item from the items table."""
@@ -236,12 +236,12 @@ class AddOrderDialog(QDialog):
         """Calculate and update the total cost of the order."""
         total = 0.0
         for row in range(self.items_table.rowCount()):
-            total_text = self.items_table.item(row, 3).text().replace('$', '').strip()
+            total_text = self.items_table.item(row, 3).text().replace('Rs.', '').strip()
             try:
                 total += float(total_text)
             except ValueError:
                 continue
-        self.total_label.setText(f"Total Cost: ${total:.2f}")
+        self.total_label.setText(f"Total Cost: Rs.{total:.2f}")
 
     def validate_and_accept(self):
         """Validate inputs and accept the dialog if all checks pass."""
@@ -260,7 +260,7 @@ class AddOrderDialog(QDialog):
         for row in range(self.items_table.rowCount()):
             product_name = self.items_table.item(row, 0).text()
             quantity = int(self.items_table.item(row, 1).text())
-            cost_per_unit_text = self.items_table.item(row, 2).text().replace('$', '').strip()
+            cost_per_unit_text = self.items_table.item(row, 2).text().replace('Rs.', '').strip()
             try:
                 cost_per_unit = float(cost_per_unit_text)
             except ValueError:
@@ -394,7 +394,7 @@ class AddOrderItemDialog(QDialog):
         self.cost_spin = QDoubleSpinBox()
         self.cost_spin.setRange(0.01, 1000000.00)
         self.cost_spin.setDecimals(2)
-        self.cost_spin.setPrefix("$ ")
+        self.cost_spin.setPrefix("Rs. ")
         self.cost_spin.setSingleStep(0.10)
         form_layout.addRow("Cost per Unit:", self.cost_spin)
 

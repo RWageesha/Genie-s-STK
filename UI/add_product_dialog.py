@@ -102,7 +102,7 @@ class AddProductDialog(QDialog):
         self.unit_price_edit.setRange(0.01, 1000000.00)
         self.unit_price_edit.setDecimals(2)
         self.unit_price_edit.setSingleStep(0.10)
-        self.unit_price_edit.setPrefix("$ ")
+        self.unit_price_edit.setPrefix("Rs. ")
         self.unit_price_edit.setStyleSheet("padding-right: 20px;")
         self.reorder_level_edit = QSpinBox()
         self.reorder_level_edit.setRange(0, 1000000)

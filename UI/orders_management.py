@@ -179,7 +179,7 @@ class OrdersManagement(QWidget):
                 self.table.setItem(row_position, 1, QTableWidgetItem(order.supplier.name if order.supplier else "N/A"))
                 self.table.setItem(row_position, 2, QTableWidgetItem(order.order_date.strftime("%Y-%m-%d")))
                 self.table.setItem(row_position, 3, QTableWidgetItem(order.expected_delivery_date.strftime("%Y-%m-%d")))
-                self.table.setItem(row_position, 4, QTableWidgetItem(f"${order.total_cost:.2f}"))
+                self.table.setItem(row_position, 4, QTableWidgetItem(f"Rs.{order.total_cost:.2f}"))
                 self.table.setItem(row_position, 5, QTableWidgetItem(order.status.value))
 
         except Exception as e:

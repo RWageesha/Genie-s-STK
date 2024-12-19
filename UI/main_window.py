@@ -3,7 +3,7 @@
 import sys
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-    QPushButton, QFrame, QStackedWidget, QLabel, QDialog
+    QPushButton, QFrame, QStackedWidget, QLabel, QDialog, QMessageBox, QButtonGroup
 )
 from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont
 from PyQt6.QtCore import Qt, QSize
@@ -15,6 +15,8 @@ from .sales_management import SalesManagement
 from .suppliers_management import SuppliersManagement
 from .orders_management import OrdersManagement
 from .reports import Reports
+from backup import fetch_data, convert_data_to_dict, save_to_json
+from restore import restore_data_from_json
 from .settings import Settings  # Ensure this module exists and is correctly implemented
 from .sell_product_widget import SellProductWidget  # Import the SellProductWidget
 
@@ -163,14 +165,14 @@ class ModernSidebarUI(QMainWindow):
         sidebar_layout.setContentsMargins(0, 0, 0, 0)
         sidebar_layout.setSpacing(10)
 
-        # Initialize Buttons
-        self.buttons = {}
+        # Initialize Navigational Buttons
+        self.nav_buttons = {}
         self.init_sidebar_buttons(sidebar_layout)
 
         # Spacer to push items to the bottom
         sidebar_layout.addStretch()
 
-        # Bottom Buttons
+        # Initialize Bottom Action Buttons
         self.init_bottom_buttons(sidebar_layout)
 
         # Add Sidebar to Main Layout
@@ -194,7 +196,7 @@ class ModernSidebarUI(QMainWindow):
         self.connect_buttons()
 
         # Set Home as the default selected button
-        self.buttons["Home"].setChecked(True)
+        self.nav_buttons["Home"].setChecked(True)
         self.stack.setCurrentIndex(0)
 
     def init_sidebar_buttons(self, layout):
@@ -205,17 +207,26 @@ class ModernSidebarUI(QMainWindow):
             ("Batch Management", "icons/batch.svg"),
             ("Sales Management", "icons/sales.svg"),
             ("Reports", "icons/reports.svg"),
+            ("Backup", "icons/backup.svg"),      # Added Backup button
+            ("Restore", "icons/restore.svg"),    # Added Restore button
         ]
+
+        self.button_group = QButtonGroup(self)
+        self.button_group.setExclusive(True)
 
         for label, icon_path in button_info:
             btn = QPushButton(f"  {label}")
             btn.setFixedHeight(40)
             btn.setIcon(load_white_icon(icon_path))
             btn.setIconSize(QSize(20, 20))
-            btn.setCheckable(True)
+            if label in ["Backup", "Restore"]:
+                btn.setCheckable(False)  # Make Backup and Restore non-checkable
+            else:
+                btn.setCheckable(True)
+                self.button_group.addButton(btn)
             btn.setStyleSheet("QPushButton { text-align: left; }")
             layout.addWidget(btn)
-            self.buttons[label] = btn
+            self.nav_buttons[label] = btn
 
     def init_bottom_buttons(self, layout):
         # Define bottom button labels and icon paths
@@ -254,41 +265,53 @@ class ModernSidebarUI(QMainWindow):
         self.stack.addWidget(self.batches_management)      # Index 2
         self.stack.addWidget(self.sales_management)        # Index 3
         self.stack.addWidget(self.reports)                 # Index 4
-        self.stack.addWidget(self.settings_page)           # Index 5 (for Settings)
+        # Note: Backup and Restore do not have corresponding pages in the stack
 
     def connect_buttons(self):
-        # Connect each button to change the stacked widget
-        self.buttons["Home"].clicked.connect(lambda: self.switch_page(0))
-        self.buttons["Product Management"].clicked.connect(lambda: self.switch_page(1))
-        self.buttons["Batch Management"].clicked.connect(lambda: self.switch_page(2))
-        self.buttons["Sales Management"].clicked.connect(lambda: self.switch_page(3))
-        self.buttons["Reports"].clicked.connect(lambda: self.switch_page(4))
-
-        # Ensure only one button is checked at a time
-        for label, btn in self.buttons.items():
-            if label != "Home":  # Home is set as default
-                btn.setAutoExclusive(False)
-                btn.clicked.connect(self.update_button_states)
+        # Connect navigational buttons to switch pages
+        self.nav_buttons["Home"].clicked.connect(lambda: self.switch_page(0))
+        self.nav_buttons["Product Management"].clicked.connect(lambda: self.switch_page(1))
+        self.nav_buttons["Batch Management"].clicked.connect(lambda: self.switch_page(2))
+        self.nav_buttons["Sales Management"].clicked.connect(lambda: self.switch_page(3))
+        self.nav_buttons["Reports"].clicked.connect(lambda: self.switch_page(4))
+        
+        # Connect Backup and Restore buttons to their functions
+        self.nav_buttons["Backup"].clicked.connect(self.backup_data)
+        self.nav_buttons["Restore"].clicked.connect(self.restore_data)
 
     def switch_page(self, index):
         self.stack.setCurrentIndex(index)
 
-    def update_button_states(self):
-        # Uncheck all buttons except the one clicked
-        for label, btn in self.buttons.items():
-            if btn.isChecked():
-                for other_label, other_btn in self.buttons.items():
-                    if other_btn != btn:
-                        other_btn.setChecked(False)
-
     def open_settings(self):
         # Navigate to the Settings page
-        self.stack.setCurrentWidget(self.settings_page)
+        if self.stack.indexOf(self.settings_page) == -1:
+            self.stack.addWidget(self.settings_page)
+        self.switch_page(self.stack.indexOf(self.settings_page))
+        # Update button states
+        for btn_label, btn in self.nav_buttons.items():
+            if btn_label not in ["Backup", "Restore"]:
+                btn.setChecked(False)
 
     def open_contact(self):
         # Open the Contact Dialog
         contact_dialog = ContactDialog()
         contact_dialog.exec()
+
+    def backup_data(self):
+        try:
+            data = fetch_data()
+            data_dict = convert_data_to_dict(data)
+            save_to_json(data_dict)
+            QMessageBox.information(self, "Backup", "Data has been backed up successfully.")
+        except Exception as e:
+            QMessageBox.critical(self, "Backup Error", f"An error occurred during backup: {e}")
+
+    def restore_data(self):
+        try:
+            message = restore_data_from_json()
+            QMessageBox.information(self, "Restore", message)
+        except Exception as e:
+            QMessageBox.critical(self, "Restore Error", f"An error occurred during restore: {e}")
 
 # Run the App
 def run_app(inventory_service):
@@ -296,3 +319,8 @@ def run_app(inventory_service):
     window = ModernSidebarUI(inventory_service)
     window.show()
     sys.exit(app.exec())
+
+if __name__ == "__main__":
+    # Assuming you have an instance of inventory_service to pass
+    # Replace `None` with your actual inventory_service instance
+    run_app(inventory_service=None)
