@@ -111,6 +111,17 @@ class SellProductWidget(QWidget):
         self.delete_item_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Delete), self)
         self.delete_item_shortcut.activated.connect(self.delete_item)
 
+        # Shortcut for focusing on Quantity input (F1)
+        self.f1_shortcut = QShortcut(QKeySequence(Qt.Key.Key_F1), self)
+        self.f1_shortcut.activated.connect(self.focus_quantity_input)
+
+        # Shortcut for finalizing the sale (F2)
+        self.f2_shortcut = QShortcut(QKeySequence(Qt.Key.Key_F2), self)
+        self.f2_shortcut.activated.connect(self.finalize_sale)
+
+    def focus_quantity_input(self):
+        self.quantity_input.setFocus()
+
     def init_ui(self):
         main_layout = QVBoxLayout()
 
@@ -299,7 +310,7 @@ class SellProductWidget(QWidget):
         """)
 
         self.total_label.setStyleSheet("color: #ffffff; font-size: 16px; font-weight:bold;")
-    
+
     def load_products(self):
         """
         Loads all products into the product_combo dropdown.
@@ -369,6 +380,10 @@ class SellProductWidget(QWidget):
 
             self.update_cart_table()
             self.quantity_input.clear()
+
+            # Clear search bar and set focus to it
+            self.search_input.clear()
+            self.search_input.setFocus()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to add to cart: {str(e)}")
 
