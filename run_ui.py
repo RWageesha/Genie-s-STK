@@ -1,5 +1,6 @@
 # run_ui.py
 
+import sys
 from data.sqlalchemy_repositories import (
     SQLAlchemyProductRepository,
     SQLAlchemyBatchRepository,
@@ -8,6 +9,7 @@ from data.sqlalchemy_repositories import (
     SQLAlchemyOrderRepository
 )
 from services.inventory_service import InventoryService
+from PyQt5.QtWidgets import QApplication
 
 def setup_inventory_service() -> InventoryService:
     product_repo = SQLAlchemyProductRepository()
@@ -27,9 +29,11 @@ def setup_inventory_service() -> InventoryService:
     return inventory_service
 
 def main():
-    inventory_service = setup_inventory_service()
-    from UI.main_window import run_app
-    run_app(inventory_service)
+    from login_window import LoginWindow
+    app = QApplication(sys.argv)
+    login_window = LoginWindow()
+    login_window.show()
+    sys.exit(app.exec())
 
 if __name__ == "__main__":
     main()

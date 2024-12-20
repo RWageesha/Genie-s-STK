@@ -455,8 +455,8 @@ class SearchProductsPage(QWidget):
             products = self.inventory.get_products()
             if algorithm == "Binary Search":
                 # Ensure the list is sorted by product_id
-                sorted_products = sorted(products, key=lambda x: x.product_id)
-                product = self.inventory.recursive_binary_search(sorted_products, product_id, 0, len(sorted_products) - 1)
+                sorted_products = self.inventory.quick_sort(products.copy(), ["product_id"])
+                product = self.inventory.binary_search(sorted_products, product_id)
             elif algorithm == "Linear Search":
                 product = self.inventory.linear_search(products, product_id)
             else:
@@ -543,7 +543,7 @@ class ReportsPage(QWidget):
             QMessageBox.warning(self, "Input Error", "Please enter a valid category name.")
 
     def calculate_value(self):
-        total = self.inventory.calculate_total_value(self.inventory.products)
+        total = self.inventory.calculate_total_value()
         self.value_result.setText(f"Total Inventory Value: Rs.{total:.2f}")
 
     def show_category_chart(self):
@@ -717,29 +717,37 @@ class Inventory:
         return self.products
 
     def quick_sort(self, arr, keys):
-        if len(arr) <= 1:
-            return arr
-        else:
-            pivot = arr[0]
-            less = []
-            greater = []
-            for item in arr[1:]:
-                if self.compare_products(item, pivot, keys) < 0:
-                    less.append(item)
-                else:
-                    greater.append(item)
-            return self.quick_sort(less, keys) + [pivot] + self.quick_sort(greater, keys)
+        """
+        Iterative Quick Sort implementation.
+        """
+        if not arr:
+            return []
 
-    def merge_sort(self, arr, keys):
-        if len(arr) > 1:
-            mid = len(arr) // 2
-            left_half = self.merge_sort(arr[:mid], keys)
-            right_half = self.merge_sort(arr[mid:], keys)
-            return self.merge(left_half, right_half, keys)
-        else:
-            return arr
+        stack = [(0, len(arr) - 1)]
+
+        while stack:
+            low, high = stack.pop()
+            if low < high:
+                pivot_index = self.partition(arr, low, high, keys)
+                stack.append((low, pivot_index - 1))
+                stack.append((pivot_index + 1, high))
+
+        return arr
+
+    def partition(self, arr, low, high, keys):
+        pivot = arr[high]
+        i = low - 1
+        for j in range(low, high):
+            if self.compare_products(arr[j], pivot, keys) < 0:
+                i += 1
+                arr[i], arr[j] = arr[j], arr[i]
+        arr[i + 1], arr[high] = arr[high], arr[i + 1]
+        return i + 1
 
     def shell_sort(self, arr, keys):
+        """
+        Iterative Shell Sort implementation.
+        """
         n = len(arr)
         gap = n // 2
         while gap > 0:
@@ -753,17 +761,53 @@ class Inventory:
             gap //= 2
         return arr
 
-    def merge(self, left, right, keys):
-        result = []
-        while left and right:
-            if self.compare_products(left[0], right[0], keys) <= 0:
-                result.append(left.pop(0))
+    def merge_sort(self, arr, keys):
+        """
+        Iterative Merge Sort implementation.
+        """
+        current_size = 1
+        n = len(arr)
+        while current_size < n:
+            left = 0
+            while left < n:
+                mid = min(left + current_size - 1, n - 1)
+                right = min(left + 2 * current_size - 1, n - 1)
+                if mid < right:
+                    self.merge(arr, left, mid, right, keys)
+                left += 2 * current_size
+            current_size *= 2
+        return arr
+
+    def merge(self, arr, left, mid, right, keys):
+        left_sub = arr[left:mid + 1]
+        right_sub = arr[mid + 1:right + 1]
+        i = j = 0
+        k = left
+        while i < len(left_sub) and j < len(right_sub):
+            if self.compare_products(left_sub[i], right_sub[j], keys) < 0:
+                arr[k] = left_sub[i]
+                i += 1
             else:
-                result.append(right.pop(0))
-        result.extend(left or right)
-        return result
+                arr[k] = right_sub[j]
+                j += 1
+            k += 1
+        while i < len(left_sub):
+            arr[k] = left_sub[i]
+            i += 1
+            k += 1
+        while j < len(right_sub):
+            arr[k] = right_sub[j]
+            j += 1
+            k += 1
 
     def compare_products(self, a, b, keys):
+        """
+        Compare two products based on multiple keys.
+        Returns:
+            -1 if a < b
+             0 if a == b
+             1 if a > b
+        """
         for key in keys:
             a_value = getattr(a, key)
             b_value = getattr(b, key)
@@ -776,17 +820,21 @@ class Inventory:
                 return 1
         return 0
 
-    def recursive_binary_search(self, arr, target_id, low, high):
-        if high >= low:
-            mid = (high + low) // 2
+    def binary_search(self, arr, target_id):
+        """
+        Iterative Binary Search implementation.
+        """
+        low = 0
+        high = len(arr) - 1
+        while low <= high:
+            mid = (low + high) // 2
             if arr[mid].product_id == target_id:
                 return arr[mid]
             elif arr[mid].product_id > target_id:
-                return self.recursive_binary_search(arr, target_id, low, mid - 1)
+                high = mid - 1
             else:
-                return self.recursive_binary_search(arr, target_id, mid + 1, high)
-        else:
-            return None
+                low = mid + 1
+        return None
 
     def linear_search(self, arr, target_id):
         for item in arr:
@@ -795,19 +843,20 @@ class Inventory:
         return None
 
     def count_products_in_category(self, products, category):
-        if not products:
-            return 0
-        count = self.count_products_in_category(products[1:], category)
-        if products[0].category.lower() == category.lower():
-            return 1 + count
-        else:
-            return count
+        count = 0
+        for product in products:
+            if product.category == category:
+                count += 1
+        return count
 
-    def calculate_total_value(self, products):
-        if not products:
-            return 0.0
-        total = self.calculate_total_value(products[1:])
-        return (products[0].price * products[0].quantity) + total
+    def calculate_total_value(self):
+        """
+        Iterative calculation of total inventory value.
+        """
+        total = 0.0
+        for product in self.products:
+            total += product.price * product.quantity
+        return total
 
     def get_category_counts(self):
         category_counts = {}
@@ -823,11 +872,13 @@ class Inventory:
             category_quantities[cat] = category_quantities.get(cat, 0) + product.quantity
         return category_quantities
 
-def run_user_app():
+from login_window import LoginWindow
+
+def main():
     app = QApplication(sys.argv)
-    window = UserMainWindow()
-    window.show()
+    login_window = LoginWindow()
+    login_window.show()
     sys.exit(app.exec())
 
 if __name__ == "__main__":
-    run_user_app()
+    main()

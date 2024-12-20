@@ -320,7 +320,11 @@ def run_app(inventory_service):
     window.show()
     sys.exit(app.exec())
 
+# Run the application
 if __name__ == "__main__":
-    # Assuming you have an instance of inventory_service to pass
-    # Replace `None` with your actual inventory_service instance
-    run_app(inventory_service=None)
+    import sys
+    from PyQt6.QtWidgets import QApplication
+    app = QApplication(sys.argv)
+    window = ModernSidebarUI()
+    window.show()
+    sys.exit(app.exec())
