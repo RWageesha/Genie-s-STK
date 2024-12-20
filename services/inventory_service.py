@@ -152,3 +152,11 @@ class InventoryService:
         # Implement logic to update the database URL and reinitialize connections if necessary
         # This is a placeholder implementation
         raise NotImplementedError("Dynamic DB URL update not supported.")
+
+    def load_all_data(self):
+        # Implement your data loading logic here
+        self.product_repo.get_all_products()
+        self.batch_repo.get_all_batches()
+        self.sale_repo.get_all_sales()
+        self.supplier_repo.get_all_suppliers()
+        self.order_repo.get_all_orders()

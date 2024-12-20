@@ -1,92 +1,97 @@
-# ui/settings.py
+import json
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QCheckBox, QLabel
+from PyQt6.QtCore import pyqtSignal, Qt
 
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QFormLayout, QLineEdit, QPushButton, QMessageBox, QHBoxLayout
-)
-from PyQt6.QtGui import QFont
-from PyQt6.QtCore import Qt
+class Settings(QDialog):
+    # Define a custom signal to emit the auto backup preference
+    auto_backup_toggled = pyqtSignal(bool)
 
-class Settings(QWidget):
     def __init__(self, inventory_service):
         super().__init__()
         self.inventory_service = inventory_service
-        self.layout = QVBoxLayout()
-        self.setLayout(self.layout)
-        
-        form_layout = QFormLayout()
-        
-        self.db_url_edit = QLineEdit()
-        self.db_url_edit.setText(self.inventory_service.get_db_url())
-        form_layout.addRow("Database URL:", self.db_url_edit)
-        
-        self.layout.addLayout(form_layout)
-        
-        # Save button
-        btn_layout = QHBoxLayout()
-        self.save_btn = QPushButton("Save Settings")
-        btn_layout.addStretch()
-        btn_layout.addWidget(self.save_btn)
-        self.layout.addLayout(btn_layout)
-        
-        self.save_btn.clicked.connect(self.save_settings)
+        self.setWindowTitle("Settings")
+        self.setFixedSize(400, 300)
 
-        self.apply_styles()
-
-    def apply_styles(self):
-        # Apply modern UI design based on the provided guidelines
-        self.setFont(QFont("Roboto", 14))
+        # Apply styles
         self.setStyleSheet("""
-            QWidget {
-                background-color: #1e1e2d;
-                color: #c4c4c4;
-                font-family: "Roboto";
+            QDialog {
+                background-color: #1e1e2d; 
+                border-radius: 10px;
+                color: transparent;
+                font-family: "Roboto", Arial, sans-serif;
+            }
+            QLabel {
                 font-size: 14px;
-            }
-
-            QFormLayout QLabel {
-                color: #00adb5;
-                font-size: 16px;
-                font-weight: 600;
-            }
-
-            QLineEdit {
-                background-color: #2b2b3c;
                 color: #ffffff;
-                border: 1px solid #5a5f66;
-                padding: 4px;
+                padding: 10px;
             }
-
-            QLineEdit:focus {
-                border: 1px solid #00adb5;
-            }
-
-            QPushButton {
-                background-color: #00adb5;
+            QCheckBox {
+                font-size: 14px;
                 color: #ffffff;
-                border-radius: 5px;
-                padding: 8px 12px;
-                font-weight: bold;
-            }
-
-            QPushButton:hover {
-                background-color: #007f8b;
-            }
-
-            QMessageBox {
-                background-color: #1e1e2d;
-                color: #c4c4c4;
             }
         """)
 
-    def save_settings(self):
-        new_db_url = self.db_url_edit.text().strip()
-        if not new_db_url:
-            QMessageBox.warning(self, "Invalid Input", "Database URL cannot be empty.")
-            return
+        # Main layout
+        layout = QVBoxLayout()
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        # Auto Backup Label
+        auto_backup_label = QLabel("Automatically backup data every 5 minutes.")
+
+        # Auto Backup Checkbox
+        self.auto_backup_checkbox = QCheckBox("Enable Auto Backup")
+        self.auto_backup_checkbox.setChecked(True)  # Default state; will be updated later
+        self.auto_backup_checkbox.stateChanged.connect(self.on_auto_backup_toggled)
+
+        # Add widgets to layout
+        layout.addWidget(auto_backup_label)
+        layout.addWidget(self.auto_backup_checkbox)
+
+        # You can add more settings here as needed
+
+        self.setLayout(layout)
+
+    def on_auto_backup_toggled(self, state):
+        """
+        Emits a signal when the auto backup checkbox is toggled.
+        
+        :param state: Integer representing the state of the checkbox.
+        """
+        is_enabled = state == Qt.CheckState.Checked
+        self.auto_backup_toggled.emit(is_enabled)
+
+    def load_settings(self):
+        """
+        Loads settings from the config file and updates the UI accordingly.
+        """
         try:
-            self.inventory_service.update_db_url(new_db_url)
-            QMessageBox.information(self, "Success", "Settings updated successfully. Please restart the application for changes to take effect.")
-        except NotImplementedError:
-            QMessageBox.critical(self, "Error", "Dynamic DB URL update not supported.")
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to update settings: {e}")
+            with open('config.json', 'r') as config_file:
+                config = json.load(config_file)
+                auto_backup_enabled = config.get('auto_backup_enabled', True)
+        except (FileNotFoundError, json.JSONDecodeError):
+            auto_backup_enabled = True  # Default to enabled
+
+        self.auto_backup_checkbox.setChecked(auto_backup_enabled)
+
+    def save_settings(self):
+        """
+        Saves current settings to the config file.
+        """
+        config = {}
+        try:
+            with open('config.json', 'r') as config_file:
+                config = json.load(config_file)
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass  # Use default if config file doesn't exist or is corrupted
+
+        config['auto_backup_enabled'] = self.auto_backup_checkbox.isChecked()
+
+        with open('config.json', 'w') as config_file:
+            json.dump(config, config_file, indent=4)
+
+    def exec_(self):
+        """
+        Overrides the exec_ method to load settings before showing the dialog.
+        """
+        self.load_settings()
+        return super().exec_()

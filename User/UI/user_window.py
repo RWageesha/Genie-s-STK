@@ -369,6 +369,42 @@ class SortProductsPage(QWidget):
         self.sort_button.clicked.connect(self.sort_products)
         layout.addWidget(self.sort_button)
 
+        # Filtering options after sorting
+        filter_layout = QHBoxLayout()
+
+        self.filter_category_combo = QComboBox()
+        self.filter_category_combo.addItem("All")
+        # Populate categories from inventory
+        categories = set([p.category for p in self.inventory.get_products()])
+        for cat in categories:
+            self.filter_category_combo.addItem(cat)
+        self.filter_category_combo.setToolTip("Filter by category")
+
+        self.filter_name_input = QLineEdit()
+        self.filter_name_input.setPlaceholderText("Filter by name substring")
+
+        self.min_price_input = QLineEdit()
+        self.min_price_input.setPlaceholderText("Min Price")
+
+        self.max_price_input = QLineEdit()
+        self.max_price_input.setPlaceholderText("Max Price")
+
+        self.filter_button = QPushButton("Filter")
+        self.filter_button.setObjectName("primaryButton")
+        self.filter_button.clicked.connect(self.apply_filter)
+
+        filter_layout.addWidget(QLabel("Category:"))
+        filter_layout.addWidget(self.filter_category_combo)
+        filter_layout.addWidget(QLabel("Name:"))
+        filter_layout.addWidget(self.filter_name_input)
+        filter_layout.addWidget(QLabel("Min Price:"))
+        filter_layout.addWidget(self.min_price_input)
+        filter_layout.addWidget(QLabel("Max Price:"))
+        filter_layout.addWidget(self.max_price_input)
+        filter_layout.addWidget(self.filter_button)
+
+        layout.addLayout(filter_layout)
+
         self.table = QTableWidget()
         self.table.setColumnCount(5)
         self.table.setHorizontalHeaderLabels(["Product ID", "Name", "Price", "Quantity", "Category"])
@@ -380,11 +416,8 @@ class SortProductsPage(QWidget):
         layout.addWidget(self.table)
 
         self.setLayout(layout)
-        self.load_products()
-
-    def load_products(self):
-        products = self.inventory.get_products()
-        self.display_products(products)
+        self.current_products = self.inventory.get_products()  # Store current displayed products
+        self.display_products(self.current_products)
 
     def sort_products(self):
         algorithm = self.algo_combo.currentText()
@@ -406,7 +439,37 @@ class SortProductsPage(QWidget):
         else:
             sorted_products = products
 
-        self.display_products(sorted_products)
+        self.current_products = sorted_products
+        self.display_products(self.current_products)
+
+    def apply_filter(self):
+        # Filter the currently displayed (already sorted) products
+        selected_category = self.filter_category_combo.currentText()
+        name_substring = self.filter_name_input.text().strip()
+
+        min_price = None
+        max_price = None
+        # Parse price values
+        try:
+            if self.min_price_input.text().strip():
+                min_price = float(self.min_price_input.text().strip())
+        except ValueError:
+            QMessageBox.warning(self, "Invalid Input", "Min Price must be a number.")
+            return
+
+        try:
+            if self.max_price_input.text().strip():
+                max_price = float(self.max_price_input.text().strip())
+        except ValueError:
+            QMessageBox.warning(self, "Invalid Input", "Max Price must be a number.")
+            return
+
+        filtered = self.inventory.filter_products(self.current_products,
+                                                  category=None if selected_category == "All" else selected_category,
+                                                  name_substring=name_substring,
+                                                  min_price=min_price,
+                                                  max_price=max_price)
+        self.display_products(filtered)
 
     def display_products(self, products):
         self.table.setRowCount(len(products))
@@ -448,6 +511,41 @@ class SearchProductsPage(QWidget):
 
         layout.addLayout(search_layout)
 
+        # Filtering UI after search
+        filter_layout = QHBoxLayout()
+
+        self.filter_category_combo = QComboBox()
+        self.filter_category_combo.addItem("All")
+        categories = set([p.category for p in self.inventory.get_products()])
+        for cat in categories:
+            self.filter_category_combo.addItem(cat)
+        self.filter_category_combo.setToolTip("Filter by category")
+
+        self.filter_name_input = QLineEdit()
+        self.filter_name_input.setPlaceholderText("Filter by name substring")
+
+        self.min_price_input = QLineEdit()
+        self.min_price_input.setPlaceholderText("Min Price")
+
+        self.max_price_input = QLineEdit()
+        self.max_price_input.setPlaceholderText("Max Price")
+
+        self.filter_button = QPushButton("Filter")
+        self.filter_button.setObjectName("primaryButton")
+        self.filter_button.clicked.connect(self.apply_filter)
+
+        filter_layout.addWidget(QLabel("Category:"))
+        filter_layout.addWidget(self.filter_category_combo)
+        filter_layout.addWidget(QLabel("Name:"))
+        filter_layout.addWidget(self.filter_name_input)
+        filter_layout.addWidget(QLabel("Min Price:"))
+        filter_layout.addWidget(self.min_price_input)
+        filter_layout.addWidget(QLabel("Max Price:"))
+        filter_layout.addWidget(self.max_price_input)
+        filter_layout.addWidget(self.filter_button)
+
+        layout.addLayout(filter_layout)
+
         self.result_table = QTableWidget()
         self.result_table.setColumnCount(5)
         self.result_table.setHorizontalHeaderLabels(["Product ID", "Name", "Price", "Quantity", "Category"])
@@ -455,6 +553,7 @@ class SearchProductsPage(QWidget):
         layout.addWidget(self.result_table)
 
         self.setLayout(layout)
+        self.search_results = []  # store current search results for filtering
 
     def search_product(self):
         try:
@@ -465,25 +564,58 @@ class SearchProductsPage(QWidget):
                 # Ensure the list is sorted by product_id
                 sorted_products = sorted(products, key=lambda x: x.product_id)
                 product = self.inventory.recursive_binary_search(sorted_products, product_id, 0, len(sorted_products) - 1)
+                self.search_results = [product] if product else []
             elif algorithm == "Linear Search":
                 product = self.inventory.linear_search(products, product_id)
+                self.search_results = [product] if product else []
             else:
-                product = None
+                self.search_results = []
 
-            if product:
-                self.display_product(product)
+            if self.search_results and self.search_results[0]:
+                self.display_products(self.search_results)
             else:
                 QMessageBox.information(self, "Not Found", "Product not found.")
+                self.result_table.setRowCount(0)
+
         except ValueError:
             QMessageBox.warning(self, "Invalid Input", "Please enter a valid Product ID.")
 
-    def display_product(self, product):
-        self.result_table.setRowCount(1)
-        self.result_table.setItem(0, 0, QTableWidgetItem(str(product.product_id)))
-        self.result_table.setItem(0, 1, QTableWidgetItem(product.name))
-        self.result_table.setItem(0, 2, QTableWidgetItem(f"{product.price:.2f}"))
-        self.result_table.setItem(0, 3, QTableWidgetItem(str(product.quantity)))
-        self.result_table.setItem(0, 4, QTableWidgetItem(product.category))
+    def apply_filter(self):
+        selected_category = self.filter_category_combo.currentText()
+        name_substring = self.filter_name_input.text().strip()
+
+        min_price = None
+        max_price = None
+        # Parse price values
+        try:
+            if self.min_price_input.text().strip():
+                min_price = float(self.min_price_input.text().strip())
+        except ValueError:
+            QMessageBox.warning(self, "Invalid Input", "Min Price must be a number.")
+            return
+
+        try:
+            if self.max_price_input.text().strip():
+                max_price = float(self.max_price_input.text().strip())
+        except ValueError:
+            QMessageBox.warning(self, "Invalid Input", "Max Price must be a number.")
+            return
+
+        filtered = self.inventory.filter_products(self.search_results,
+                                                  category=None if selected_category == "All" else selected_category,
+                                                  name_substring=name_substring,
+                                                  min_price=min_price,
+                                                  max_price=max_price)
+        self.display_products(filtered)
+
+    def display_products(self, products):
+        self.result_table.setRowCount(len(products))
+        for row, product in enumerate(products):
+            self.result_table.setItem(row, 0, QTableWidgetItem(str(product.product_id)))
+            self.result_table.setItem(row, 1, QTableWidgetItem(product.name))
+            self.result_table.setItem(row, 2, QTableWidgetItem(f"{product.price:.2f}"))
+            self.result_table.setItem(row, 3, QTableWidgetItem(str(product.quantity)))
+            self.result_table.setItem(row, 4, QTableWidgetItem(product.category))
 
 class ReportsPage(QWidget):
     def __init__(self, inventory):
@@ -848,6 +980,22 @@ class Inventory:
             cat = product.category
             category_quantities[cat] = category_quantities.get(cat, 0) + product.quantity
         return category_quantities
+
+    def filter_products(self, products, category=None, name_substring=None, min_price=None, max_price=None):
+        """Filter products by category, name substring, and optional price range."""
+        filtered = []
+        for p in products:
+            if category is not None and p.category != category:
+                continue
+            if name_substring is not None and name_substring != "":
+                if name_substring.lower() not in p.name.lower():
+                    continue
+            if min_price is not None and p.price < min_price:
+                continue
+            if max_price is not None and p.price > max_price:
+                continue
+            filtered.append(p)
+        return filtered
 
 from login_window import LoginWindow
 

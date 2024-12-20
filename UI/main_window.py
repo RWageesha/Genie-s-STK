@@ -1,12 +1,11 @@
-# UI/main_window.py
-
 import sys
+import json
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QPushButton, QFrame, QStackedWidget, QLabel, QDialog, QMessageBox, QButtonGroup
 )
 from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont
-from PyQt6.QtCore import Qt, QSize, QTimer
+from PyQt6.QtCore import Qt, QSize, QTimer, pyqtSignal
 from PyQt6.QtSvg import QSvgRenderer  # Corrected import
 
 from .products_management import ProductsManagement
@@ -114,21 +113,30 @@ class ContactDialog(QDialog):
 
         self.setLayout(layout)
 
+from UI.loading_dialog import LoadingDialog
+from worker import DataLoader
+
 class ModernSidebarUI(QMainWindow):
     def __init__(self, inventory_service):
         super().__init__()
-
         self.inventory_service = inventory_service
-
         self.setWindowTitle("Pharmacy Inventory Management")
         self.setGeometry(100, 100, 1200, 700)
+
+        # Initialize Loading Dialog
+        self.loading_dialog = LoadingDialog()
+        self.loading_dialog.show()
+
+        # Initialize and start the worker thread
+        self.worker = DataLoader(self.inventory_service)
+        self.worker.finished.connect(self.on_data_loaded)
+        self.worker.start()
 
         # Central Widget
         self.central_widget = QWidget()
         self.central_widget.setStyleSheet("background-color: #f4f4f4;")
         self.setCentralWidget(self.central_widget)
 
-        # Main Layout
         main_layout = QHBoxLayout(self.central_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
@@ -139,7 +147,7 @@ class ModernSidebarUI(QMainWindow):
         sidebar.setStyleSheet("""
             QFrame {
                 background-color: #1e1e2d;
-                border-right: 0.5px solid #2b2b3c; /* Reduced from 1px to 0.5px */
+                border-right: 0.5px solid #2b2b3c;
             }
             QPushButton {
                 background-color: transparent;
@@ -152,15 +160,16 @@ class ModernSidebarUI(QMainWindow):
             }
             QPushButton:hover {
                 background-color: #2b2b3c;
-                border-left: 2px solid #00adb5; /* Reduced from 3px to 2px */
+                border-left: 2px solid #00adb5;
                 color: #00adb5;
             }
             QPushButton:checked {
                 background-color: #2b2b3c;
-                border-left: 2px solid #00adb5; /* Reduced from 3px to 2px */
+                border-left: 2px solid #00adb5;
                 color: #00adb5;
             }
         """)
+
         sidebar_layout = QVBoxLayout(sidebar)
         sidebar_layout.setContentsMargins(0, 0, 0, 0)
         sidebar_layout.setSpacing(10)
@@ -201,6 +210,9 @@ class ModernSidebarUI(QMainWindow):
 
         # Initialize and start the auto backup timer
         self.init_auto_backup()
+
+    def on_data_loaded(self):
+        self.loading_dialog.close()
 
     def init_sidebar_buttons(self, layout):
         # Define button labels and corresponding icon paths
@@ -265,13 +277,16 @@ class ModernSidebarUI(QMainWindow):
         self.reports = Reports(self.inventory_service)
         self.settings_page = Settings(self.inventory_service)  # Assuming Settings module exists
 
+        # Connect the Settings dialog signal to the toggle_auto_backup_slot
+        self.settings_page.auto_backup_toggled.connect(self.toggle_auto_backup_slot)
+
         # Add widgets to the stack in the same order as buttons
         self.stack.addWidget(self.home_page)               # Index 0 (Home)
         self.stack.addWidget(self.products_management)     # Index 1
         self.stack.addWidget(self.batches_management)      # Index 2
         self.stack.addWidget(self.sales_management)        # Index 3
         self.stack.addWidget(self.reports)                 # Index 4
-        # Note: Backup and Restore do not have corresponding pages in the stack
+        self.stack.addWidget(self.settings_page)           # Index 5
 
     def connect_buttons(self):
         # Connect navigational buttons to switch pages
@@ -290,9 +305,7 @@ class ModernSidebarUI(QMainWindow):
 
     def open_settings(self):
         # Navigate to the Settings page
-        if self.stack.indexOf(self.settings_page) == -1:
-            self.stack.addWidget(self.settings_page)
-        self.switch_page(self.stack.indexOf(self.settings_page))
+        self.switch_page(5)  # Assuming Settings is at index 5
         # Update button states
         for btn_label, btn in self.nav_buttons.items():
             if btn_label not in ["Backup", "Restore"]:
@@ -330,11 +343,13 @@ class ModernSidebarUI(QMainWindow):
 
     def init_auto_backup(self):
         """
-        Initializes the automatic backup timer to run every 5 seconds without user notification.
+        Initializes the automatic backup timer.
         """
         self.auto_backup_timer = QTimer(self)
         self.auto_backup_timer.timeout.connect(self.auto_backup)
-        self.auto_backup_timer.start(5000)  # 5000 milliseconds = 5 seconds
+        
+        # Load auto backup setting
+        self.load_auto_backup_setting()
 
     def auto_backup(self):
         """
@@ -348,6 +363,53 @@ class ModernSidebarUI(QMainWindow):
         except Exception as e:
             # Optionally log the error to a file or console
             print(f"Auto Backup Error: {e}")
+
+    def load_auto_backup_setting(self):
+        """
+        Loads the auto backup setting from a config file.
+        """
+        try:
+            with open('config.json', 'r') as config_file:
+                config = json.load(config_file)
+                auto_backup_enabled = config.get('auto_backup_enabled', True)
+        except (FileNotFoundError, json.JSONDecodeError):
+            auto_backup_enabled = True  # Default to enabled
+
+        if auto_backup_enabled:
+            self.auto_backup_timer.start(300000)  # 5 minutes in milliseconds
+        else:
+            self.auto_backup_timer.stop()
+
+    def save_auto_backup_setting(self, enabled):
+        """
+        Saves the auto backup setting to a config file.
+        """
+        config = {}
+        try:
+            with open('config.json', 'r') as config_file:
+                config = json.load(config_file)
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass  # Use default if config file doesn't exist or is corrupted
+
+        config['auto_backup_enabled'] = enabled
+
+        with open('config.json', 'w') as config_file:
+            json.dump(config, config_file, indent=4)
+
+    def toggle_auto_backup_slot(self, enabled):
+        """
+        Slot to handle auto backup toggle from the Settings dialog.
+        
+        :param enabled: Boolean indicating whether to enable auto backup.
+        """
+        if enabled:
+            self.auto_backup_timer.start(300000)  # 5 minutes in milliseconds
+            QMessageBox.information(self, "Auto Backup", "Auto Backup has been enabled.")
+        else:
+            self.auto_backup_timer.stop()
+            QMessageBox.information(self, "Auto Backup", "Auto Backup has been disabled.")
+        
+        self.save_auto_backup_setting(enabled)
 
 # Run the App
 def run_app(inventory_service):

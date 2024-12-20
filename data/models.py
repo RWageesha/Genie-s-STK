@@ -23,26 +23,44 @@ class Product(Base):
     unit_price = Column(Float, nullable=False)
     reorder_level = Column(Integer, nullable=False)
 
-    batches = relationship("Batch", back_populates="product")
-    sale_records = relationship("SaleRecord", back_populates="product")
+    batches = relationship(
+        "Batch",
+        back_populates="product",
+        cascade="all, delete-orphan",
+        passive_deletes=True
+    )
+    sale_records = relationship(
+        "SaleRecord",
+        back_populates="product",
+        cascade="all, delete-orphan",
+        passive_deletes=True
+    )
     order_items = relationship("OrderItem", back_populates="product")
 
 class Batch(Base):
     __tablename__ = "batches"
 
     batch_id = Column(Integer, primary_key=True, index=True)
-    product_id = Column(Integer, ForeignKey("products.product_id"), nullable=False)
+    product_id = Column(
+        Integer,
+        ForeignKey("products.product_id", ondelete="CASCADE"),
+        nullable=False
+    )
     quantity = Column(Integer, nullable=False)
     manufacture_date = Column(Date, nullable=False)
     expiry_date = Column(Date, nullable=False)
 
-    product = relationship("Product", back_populates="batches")
+    product = relationship(
+        "Product",
+        back_populates="batches",
+        passive_deletes=True
+    )
 
 class SaleRecord(Base):
     __tablename__ = "sale_records"
 
     sale_id = Column(Integer, primary_key=True, index=True)
-    product_id = Column(Integer, ForeignKey("products.product_id"), nullable=False)
+    product_id = Column(Integer, ForeignKey("products.product_id", ondelete="CASCADE"), nullable=False)
     quantity_sold = Column(Integer, nullable=False)
     sale_date = Column(Date, nullable=False)
     unit_price_at_sale = Column(Float, nullable=False)

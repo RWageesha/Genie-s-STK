@@ -2,18 +2,77 @@ import sys
 import os
 import json
 import hashlib
+import time
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox,
     QApplication, QHBoxLayout, QGraphicsOpacityEffect, QToolButton
 )
-from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QRect
+from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QRect, QObject, QThread, pyqtSignal
 from PyQt6.QtGui import QIcon
 
 # Import your UI classes and setup function
 from UI.main_window import ModernSidebarUI
 from services.inventory_service import InventoryService  # Adjust path as needed
 from run_ui import setup_inventory_service
+
+# Import the LoadingDialog
+from UI.loading_dialog import LoadingDialog  # Adjust the import path as needed
+
+
+class Worker(QObject):
+    finished = pyqtSignal(dict)
+    error = pyqtSignal(str)
+
+    def __init__(self, username, password):
+        super().__init__()
+        self.username = username
+        self.password = password
+
+    def run(self):
+        try:
+            time.sleep(2)  # Simulate a delay for demonstration purposes
+            user = self.get_user(self.username)
+            if user and self.verify_password(self.password, user['password']):
+                self.finished.emit(user)
+            else:
+                self.error.emit("Invalid username or password.")
+        except Exception as e:
+            self.error.emit(str(e))
+
+    def get_user(self, username):
+        users = self.load_users()
+        for user in users:
+            if user['username'] == username:
+                return user
+        return None
+
+    def load_users(self):
+        users_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'users.json')
+        if not os.path.exists(users_file):
+            self.error.emit("Users file not found.")
+            return []
+        with open(users_file, 'r') as f:
+            try:
+                return json.load(f)
+            except json.JSONDecodeError:
+                self.error.emit("Users file is corrupted.")
+                return []
+
+    def verify_password(self, password, hashed_password):
+        return hashlib.sha256(password.encode()).hexdigest() == hashed_password
+
+
+class InventoryServiceWorker(QObject):
+    finished = pyqtSignal(object)
+    error = pyqtSignal(str)
+
+    def run(self):
+        try:
+            inventory_service = setup_inventory_service()
+            self.finished.emit(inventory_service)
+        except Exception as e:
+            self.error.emit(str(e))
 
 
 class LoginWindow(QWidget):
@@ -24,6 +83,9 @@ class LoginWindow(QWidget):
         self.init_ui()
         self.apply_styles()
         self.setFixedSize(400, 500)
+
+        # Initialize Loading Dialog with no parent to prevent it from closing when login window is hidden
+        self.loading_dialog = LoadingDialog()
 
         # Fade-in animation
         self.opacity_effect = QGraphicsOpacityEffect(self)
@@ -72,14 +134,14 @@ class LoginWindow(QWidget):
 
         main_layout.addLayout(password_layout)
 
-        login_button = QPushButton("Login")
-        login_button.setObjectName("primaryButton")
-        login_button.clicked.connect(self.authenticate)
-        login_button.setFixedHeight(40)
-        main_layout.addWidget(login_button)
+        self.login_button = QPushButton("Login")
+        self.login_button.setObjectName("primaryButton")
+        self.login_button.clicked.connect(self.authenticate)
+        self.login_button.setFixedHeight(40)
+        main_layout.addWidget(self.login_button)
 
         # Set the Login button as the default button
-        login_button.setDefault(True)
+        self.login_button.setDefault(True)
 
         signup_layout = QHBoxLayout()
         signup_label = QLabel("Don't have an account?")
@@ -92,9 +154,6 @@ class LoginWindow(QWidget):
         signup_layout.addWidget(signup_button)
         signup_layout.addStretch()
         main_layout.addLayout(signup_layout)
-
-        # Connect returnPressed signal in signup fields to register_user
-        signup_button.setDefault(True)
 
         # Admin creation link
         admin_layout = QHBoxLayout()
@@ -174,6 +233,13 @@ class LoginWindow(QWidget):
             }
         """)
 
+    def show_loading(self):
+        self.loading_dialog.show()
+        QApplication.processEvents()  # Ensure the dialog is rendered
+
+    def hide_loading(self):
+        self.loading_dialog.close()
+
     def authenticate(self):
         username = self.username_edit.text().strip()
         password = self.password_edit.text().strip()
@@ -182,53 +248,94 @@ class LoginWindow(QWidget):
             QMessageBox.warning(self, "Input Error", "Please enter both username and password.")
             return
 
-        user = self.get_user(username)
-        if user and self.verify_password(password, user['password']):
-            QMessageBox.information(self, "Success", f"Welcome, {username}!")
-            self.open_main_window(user['role'])
-        else:
-            QMessageBox.critical(self, "Authentication Failed", "Invalid username or password.")
+        # Show loading and hide login window
+        self.show_loading()
+        self.hide()
 
-    def get_user(self, username):
-        users = self.load_users()
-        for user in users:
-            if user['username'] == username:
-                return user
-        return None
+        # Disable login controls to prevent multiple attempts
+        self.login_button.setEnabled(False)
+        self.username_edit.setEnabled(False)
+        self.password_edit.setEnabled(False)
 
-    def load_users(self):
-        users_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'users.json')
-        if not os.path.exists(users_file):
-            QMessageBox.critical(self, "Error", "Users file not found.")
-            sys.exit(1)
-        with open(users_file, 'r') as f:
-            try:
-                return json.load(f)
-            except json.JSONDecodeError:
-                QMessageBox.critical(self, "Error", "Users file is corrupted.")
-                sys.exit(1)
+        # Set up Worker and Thread for authentication
+        self.thread = QThread()
+        self.worker = Worker(username, password)
+        self.worker.moveToThread(self.thread)
 
-    def verify_password(self, password, hashed_password):
-        return hashlib.sha256(password.encode()).hexdigest() == hashed_password
+        # Connect signals and slots
+        self.thread.started.connect(self.worker.run)
+        self.worker.finished.connect(self.on_auth_success)
+        self.worker.error.connect(self.on_auth_error)
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.worker.error.connect(self.thread.quit)
+        self.worker.error.connect(self.worker.deleteLater)
+
+        # Start the thread
+        self.thread.start()
+
+    def on_auth_success(self, user):
+        self.open_main_window(user['role'])
+        # Re-enable login controls
+        self.login_button.setEnabled(True)
+        self.username_edit.setEnabled(True)
+        self.password_edit.setEnabled(True)
+
+    def on_auth_error(self, error_message):
+        self.hide_loading()
+        QMessageBox.critical(self, "Authentication Failed", error_message)
+        self.show()  # Show the login window again
+        # Re-enable login controls
+        self.login_button.setEnabled(True)
+        self.username_edit.setEnabled(True)
+        self.password_edit.setEnabled(True)
 
     def open_main_window(self, role):
-        self.close()
         if role == 'admin':
-            try:
-                inventory_service = setup_inventory_service()
-                self.main_window = ModernSidebarUI(inventory_service)
-                self.main_window.show()
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to open admin dashboard: {e}")
-                sys.exit(1)
+            self.show_loading()
+
+            # Set up Worker and Thread for Inventory Service
+            self.inventory_thread = QThread()
+            self.inventory_worker = InventoryServiceWorker()
+            self.inventory_worker.moveToThread(self.inventory_thread)
+
+            # Connect signals and slots
+            self.inventory_thread.started.connect(self.inventory_worker.run)
+            self.inventory_worker.finished.connect(self.on_inventory_success)
+            self.inventory_worker.error.connect(self.on_inventory_error)
+            self.inventory_worker.finished.connect(self.inventory_thread.quit)
+            self.inventory_worker.finished.connect(self.inventory_worker.deleteLater)
+            self.inventory_thread.finished.connect(self.inventory_thread.deleteLater)
+            self.inventory_worker.error.connect(self.inventory_thread.quit)
+            self.inventory_worker.error.connect(self.inventory_worker.deleteLater)
+
+            # Start the thread
+            self.inventory_thread.start()
         else:
             try:
                 from User.UI.user_window import UserMainWindow
             except ImportError:
+                self.hide_loading()
                 QMessageBox.critical(self, "Error", "Failed to import UserMainWindow. Please check the module path.")
-                sys.exit(1)
+                self.show()  # Show the login window again
+                return
             self.main_window = UserMainWindow()
             self.main_window.show()
+
+            self.hide_loading()
+            self.hide()  # Hide the login window instead of closing
+
+    def on_inventory_success(self, inventory_service):
+        self.main_window = ModernSidebarUI(inventory_service)
+        self.main_window.show()
+        self.hide_loading()
+        self.hide()  # Hide the login window instead of closing
+
+    def on_inventory_error(self, error_message):
+        self.hide_loading()
+        QMessageBox.critical(self, "Error", f"Failed to open admin dashboard: {error_message}")
+        self.show()  # Show the login window again
 
     def open_signup_window(self):
         self.signup_window = SignupWindow()
@@ -243,6 +350,9 @@ class SignupWindow(QWidget):
         self.init_ui()
         self.apply_styles()
         self.setFixedSize(400, 600)
+
+        # Initialize Loading Dialog (optional)
+        self.loading_dialog = LoadingDialog()
 
         # Fade-in animation
         self.opacity_effect = QGraphicsOpacityEffect(self)
@@ -282,6 +392,7 @@ class SignupWindow(QWidget):
 
         # Connect returnPressed signal to register_user
         self.password_edit.returnPressed.connect(self.register_user)
+        self.setLayout(main_layout)
 
         self.toggle_password_btn = QToolButton()
         self.toggle_password_btn.setIcon(QIcon(os.path.join(script_dir, "icons", "eye_closed.png")))
@@ -309,14 +420,14 @@ class SignupWindow(QWidget):
 
         main_layout.addLayout(confirm_password_layout)
 
-        signup_button = QPushButton("Sign Up")
-        signup_button.setObjectName("primaryButton")
-        signup_button.clicked.connect(self.register_user)
-        signup_button.setFixedHeight(40)
-        main_layout.addWidget(signup_button)
+        self.signup_button = QPushButton("Sign Up")
+        self.signup_button.setObjectName("primaryButton")
+        self.signup_button.clicked.connect(self.register_user)
+        self.signup_button.setFixedHeight(40)
+        main_layout.addWidget(self.signup_button)
 
         # Set the Sign Up button as the default button
-        signup_button.setDefault(True)
+        self.signup_button.setDefault(True)
 
         self.setLayout(main_layout)
 
@@ -387,6 +498,13 @@ class SignupWindow(QWidget):
             }
         """)
 
+    def show_loading(self):
+        self.loading_dialog.show()
+        QApplication.processEvents()  # Ensure the dialog is rendered
+
+    def hide_loading(self):
+        self.loading_dialog.close()
+
     def register_user(self):
         username = self.username_edit.text().strip()
         password = self.password_edit.text().strip()
@@ -428,6 +546,52 @@ class SignupWindow(QWidget):
         users_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'users.json')
         with open(users_file, 'w') as f:
             json.dump(users, f, indent=4)
+
+    def open_main_window(self, role):
+        if role == 'admin':
+            self.show_loading()
+
+            # Set up Worker and Thread for Inventory Service
+            self.inventory_thread = QThread()
+            self.inventory_worker = InventoryServiceWorker()
+            self.inventory_worker.moveToThread(self.inventory_thread)
+
+            # Connect signals and slots
+            self.inventory_thread.started.connect(self.inventory_worker.run)
+            self.inventory_worker.finished.connect(self.on_inventory_success)
+            self.inventory_worker.error.connect(self.on_inventory_error)
+            self.inventory_worker.finished.connect(self.inventory_thread.quit)
+            self.inventory_worker.finished.connect(self.inventory_worker.deleteLater)
+            self.inventory_thread.finished.connect(self.inventory_thread.deleteLater)
+            self.inventory_worker.error.connect(self.inventory_thread.quit)
+            self.inventory_worker.error.connect(self.inventory_worker.deleteLater)
+
+            # Start the thread
+            self.inventory_thread.start()
+        else:
+            try:
+                from User.UI.user_window import UserMainWindow
+            except ImportError:
+                self.hide_loading()
+                QMessageBox.critical(self, "Error", "Failed to import UserMainWindow. Please check the module path.")
+                self.show()  # Show the login window again
+                return
+            self.main_window = UserMainWindow()
+            self.main_window.show()
+
+            self.hide_loading()
+            self.hide()  # Hide the login window instead of closing
+
+    def on_inventory_success(self, inventory_service):
+        self.main_window = ModernSidebarUI(inventory_service)
+        self.main_window.show()
+        self.hide_loading()
+        self.hide()  # Hide the login window instead of closing
+
+    def on_inventory_error(self, error_message):
+        self.hide_loading()
+        QMessageBox.critical(self, "Error", f"Failed to open admin dashboard: {error_message}")
+        self.show()  # Show the login window again
 
 
 # Run the application if needed

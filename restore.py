@@ -3,11 +3,23 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import text
 from data.models import Product, Batch, SaleRecord, Supplier, Order, OrderItem
 from data.db_config import engine
+import tkinter as tk
+from tkinter import filedialog
 
 # Create a new session
 SessionLocal = sessionmaker(bind=engine)
 
-def restore_data_from_json(filename='backup.json'):
+def restore_data_from_json(filename='backupbyUser.json'):
+    root = tk.Tk()
+    root.withdraw()  # Hide the root window
+
+    filename = filedialog.askopenfilename(
+        title="Select backup JSON file",
+        filetypes=(("JSON files", "*.json"), ("All files", "*.*"))
+    )
+
+    if not filename:
+        return "No file selected."
     try:
         with open(filename, 'r') as f:
             data_dict = json.load(f)
