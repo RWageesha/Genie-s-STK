@@ -3,7 +3,7 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QComboBox,
     QPushButton, QMessageBox, QHBoxLayout, QDateEdit,
-    QFormLayout, QFrame, QSpinBox, QDialogButtonBox
+    QFormLayout, QFrame, QSpinBox, QDialogButtonBox, QLineEdit
 )
 from PyQt6.QtCore import Qt, QDate
 from PyQt6.QtGui import QFont, QIcon
@@ -104,7 +104,7 @@ class EditBatchDialog(QDialog):
         self.main_layout.setContentsMargins(20, 20, 20, 20)
 
         # Header
-        header = QLabel("Edit Batch" if self.batch else "Edit Batch")
+        header = QLabel(f"Edit Batch ID {self.batch.batch_id}" if self.batch else "Edit Batch")
         header.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
         self.main_layout.addWidget(header)
@@ -125,7 +125,7 @@ class EditBatchDialog(QDialog):
 
         # Product Selection
         self.product_combo = QComboBox()
-        self.product_combo.addItems([product.name for product in self.products])
+        self.populate_product_combo()
         self.product_combo.setPlaceholderText("Select Product")
         form_layout.addRow("Product:", self.product_combo)
 
@@ -179,9 +179,20 @@ class EditBatchDialog(QDialog):
         if self.batch:
             product = next((p for p in self.products if p.product_id == self.batch.product_id), None)
             if product:
-                index = self.product_combo.findText(product.name)
+                index = self.product_combo.findData(product.product_id)
                 if index != -1:
                     self.product_combo.setCurrentIndex(index)
+
+    def populate_product_combo(self):
+        """
+        Populates the product_combo with product names and sets the product_id as user data.
+        """
+        self.product_combo.clear()
+        for product in self.products:
+            self.product_combo.addItem(product.name, product.product_id)
+        if not self.products:
+            self.product_combo.setEnabled(False)
+            QMessageBox.warning(self, "No Products", "No products available to select.")
 
     def validate_and_accept(self):
         product_id = self.product_combo.currentData()
@@ -214,12 +225,15 @@ class EditBatchDialog(QDialog):
         """
         Retrieve the updated batch data from the dialog.
         """
-        product_name = self.product_combo.currentText().strip()
-        product = next((p for p in self.products if p.name == product_name), None)
+        product_id = self.product_combo.currentData()
+        quantity = self.quantity_spin.value()
+        manufacture_date = self.manufacture_date_edit.date().toPyDate()
+        expiry_date = self.expiry_date_edit.date().toPyDate()
+
         return Batch(
             batch_id=self.batch.batch_id if self.batch else None,
-            product_id=product.product_id if product else None,
-            quantity=self.quantity_spin.value(),
-            manufacture_date=self.manufacture_date_edit.date().toPyDate(),
-            expiry_date=self.expiry_date_edit.date().toPyDate()
+            product_id=product_id,
+            quantity=quantity,
+            manufacture_date=manufacture_date,
+            expiry_date=expiry_date
         )

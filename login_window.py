@@ -62,7 +62,6 @@ class Worker(QObject):
     def verify_password(self, password, hashed_password):
         return hashlib.sha256(password.encode()).hexdigest() == hashed_password
 
-
 class InventoryServiceWorker(QObject):
     finished = pyqtSignal(object)
     error = pyqtSignal(str)
@@ -73,7 +72,6 @@ class InventoryServiceWorker(QObject):
             self.finished.emit(inventory_service)
         except Exception as e:
             self.error.emit(str(e))
-
 
 class LoginWindow(QWidget):
     def __init__(self):

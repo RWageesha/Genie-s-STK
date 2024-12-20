@@ -750,12 +750,13 @@ class ContactDialog(QDialog):
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_label.setFont(QFont("Arial", 22, QFont.Weight.Bold))
 
+        # Contact Information
         contact_info = QLabel(
             "For support, reach out to us:\n\n"
-            "📧 Email: support@example.com\n"
-            "📞 Phone: +1 234 567 8900\n"
-            "🏢 Address: 123 Main Street\n"
-            "City, Country"
+            "📧 Email: teamclaptac@gmail.com\n"
+            "📞 Phone: +94 71 848 33 55\n"
+            "🏢 Address: Claptac Inc\n"
+            "Sri Lanka"
         )
         contact_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
         contact_info.setWordWrap(True)
@@ -783,7 +784,7 @@ class Inventory:
             # Get the directory two levels up from the current file
             script_dir = os.path.dirname(os.path.abspath(__file__))
             BASE_DIR = os.path.abspath(os.path.join(script_dir, '..', '..'))
-            backup_file = os.path.join(BASE_DIR, 'backup.json')
+            backup_file = os.path.join(BASE_DIR, 'backupbyUser.json')
 
             print(f"Looking for backup.json at: {backup_file}")
 

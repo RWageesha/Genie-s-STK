@@ -1,79 +1,61 @@
 # UI/batches_management.py
-
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QPushButton, QTableWidget, QTableWidgetItem,
-    QMessageBox, QDialog, QHBoxLayout, QHeaderView
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QDialog
 )
 from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt
 
-from .add_batch_dialog import AddBatchDialog
-from .edit_batch_dialog import EditBatchDialog
-from domain.domain_models import Batch, Product
-from typing import List, Optional
+from .edit_batch_dialog import EditBatchDialog  # Ensure correct import
+from .add_batch_dialog import AddBatchDialog      # Ensure AddBatchDialog is imported
 
 class BatchesManagement(QWidget):
     def __init__(self, inventory_service):
         super().__init__()
         self.inventory_service = inventory_service
-        self.init_ui()
-
-    def init_ui(self):
-        layout = QVBoxLayout()
+        self.layout = QVBoxLayout()
+        self.setLayout(self.layout)
         
-        # Buttons Layout
-        buttons_layout = QHBoxLayout()
+        # Top buttons
+        btn_layout = QHBoxLayout()
+        self.add_batch_btn = QPushButton("Add Batch")
+        self.edit_batch_btn = QPushButton("Edit Batch")
+        self.delete_batch_btn = QPushButton("Delete Batch")
+        self.refresh_data_btn = QPushButton("Refresh")  # New Refresh button
         
-        # Add Batch Button
-        add_button = QPushButton("Add Batch")
-        add_button.clicked.connect(self.add_batch)
-        buttons_layout.addWidget(add_button)
+        self.add_batch_btn.clicked.connect(self.add_batch)
+        self.edit_batch_btn.clicked.connect(self.edit_batch)
+        self.delete_batch_btn.clicked.connect(self.delete_batch)
+        self.refresh_data_btn.clicked.connect(self.refresh_data)  # Connect to a new method
         
-        # Edit Batch Button
-        edit_button = QPushButton("Edit Batch")
-        edit_button.clicked.connect(self.edit_batch)
-        buttons_layout.addWidget(edit_button)
+        btn_layout.addWidget(self.add_batch_btn)
+        btn_layout.addWidget(self.edit_batch_btn)
+        btn_layout.addWidget(self.delete_batch_btn)
+        btn_layout.addWidget(self.refresh_data_btn)  # Add Refresh button to layout
+        btn_layout.addStretch()
         
-        # Delete Batch Button
-        delete_button = QPushButton("Delete Batch")
-        delete_button.clicked.connect(self.delete_batch)
-        buttons_layout.addWidget(delete_button)
+        self.layout.addLayout(btn_layout)
         
-        # Refresh Button
-        refresh_button = QPushButton("Refresh")
-        refresh_button.clicked.connect(self.load_batches)
-        buttons_layout.addWidget(refresh_button)
-        
-        layout.addLayout(buttons_layout)
-        
-        # Batches Table
+        # Batches table
         self.table = QTableWidget()
         self.table.setColumnCount(5)
         self.table.setHorizontalHeaderLabels([
-            "Batch ID", "Product Name", "Quantity",
-            "Manufacture Date", "Expiry Date"
+            "Batch ID", "Product ID", "Quantity", "Manufacture Date", "Expiry Date"
         ])
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.table.horizontalHeader().setStretchLastSection(True)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        layout.addWidget(self.table)
+        self.layout.addWidget(self.table)
         
-        self.setLayout(layout)
-        
-        self.apply_styles()
         self.load_batches()
+        self.apply_styles()
 
     def apply_styles(self):
-        # Apply modern UI design based on the provided guidelines
         self.setFont(QFont("Roboto", 14))
         self.setStyleSheet("""
             QWidget {
                 background-color: #1e1e2d;
                 color: #c4c4c4;
                 font-family: "Roboto";
-                font-size: 14px;
             }
 
             QPushButton {
@@ -118,49 +100,30 @@ class BatchesManagement(QWidget):
         """)
 
     def load_batches(self):
-        """
-        Loads all batches from the inventory service and displays them in the table.
-        """
-        try:
-            batches = self.inventory_service.get_all_batches()
-            self.table.setRowCount(len(batches))
-            for row, batch in enumerate(batches):
-                self.table.setItem(row, 0, QTableWidgetItem(str(batch.batch_id)))
-                
-                # Fetch product name instead of product_id
-                product = self.inventory_service.get_product_by_id(batch.product_id)
-                product_name = product.name if product else "Unknown"
-                self.table.setItem(row, 1, QTableWidgetItem(product_name))
-                
-                self.table.setItem(row, 2, QTableWidgetItem(str(batch.quantity)))
-                self.table.setItem(row, 3, QTableWidgetItem(batch.manufacture_date.strftime("%Y-%m-%d")))
-                self.table.setItem(row, 4, QTableWidgetItem(batch.expiry_date.strftime("%Y-%m-%d")))
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to load batches: {str(e)}")
-
+        self.table.setRowCount(0)
+        batches = self.inventory_service.get_all_batches()
+        for batch in batches:
+            row_position = self.table.rowCount()
+            self.table.insertRow(row_position)
+            self.table.setItem(row_position, 0, QTableWidgetItem(str(batch.batch_id)))
+            self.table.setItem(row_position, 1, QTableWidgetItem(str(batch.product_id)))
+            self.table.setItem(row_position, 2, QTableWidgetItem(str(batch.quantity)))
+            self.table.setItem(row_position, 3, QTableWidgetItem(batch.manufacture_date.strftime("%Y-%m-%d")))
+            self.table.setItem(row_position, 4, QTableWidgetItem(batch.expiry_date.strftime("%Y-%m-%d")))
+        self.table.resizeColumnsToContents()
+    
     def add_batch(self):
-        """
-        Opens the AddBatchDialog to collect batch details and adds the batch upon successful input.
-        """
-        products = self.inventory_service.get_all_products()
-        if not products:
-            QMessageBox.warning(self, "No Products", "No products available. Please add products first.")
-            return
-        
-        dialog = AddBatchDialog(products)
+        dialog = AddBatchDialog(self, self.inventory_service.get_all_products())
         if dialog.exec() == QDialog.DialogCode.Accepted:
             batch = dialog.get_batch_data()
             try:
                 self.inventory_service.add_batch(batch)
-                QMessageBox.information(self, "Success", "Batch added successfully.")
+                QMessageBox.information(self, "Success", f"Batch ID {batch.batch_id} added successfully.")
                 self.load_batches()
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to add batch: {str(e)}")
-
+                QMessageBox.critical(self, "Error", f"Failed to add batch: {e}")
+    
     def edit_batch(self):
-        """
-        Opens the EditBatchDialog to modify the selected batch's details.
-        """
         selected_row = self.table.currentRow()
         if selected_row < 0:
             QMessageBox.warning(self, "No Selection", "Please select a batch to edit.")
@@ -174,23 +137,20 @@ class BatchesManagement(QWidget):
         batch_id = int(batch_id_item.text())
         batch = self.inventory_service.get_batch_by_id(batch_id)
         if not batch:
-            QMessageBox.warning(self, "Error", "Selected batch not found.")
+            QMessageBox.critical(self, "Error", "Selected batch not found.")
             return
-        
-        dialog = EditBatchDialog(batch, self.inventory_service.get_all_products())
+        # Corrected instantiation: pass self as parent
+        dialog = EditBatchDialog(self, batch, self.inventory_service.get_all_products())
         if dialog.exec() == QDialog.DialogCode.Accepted:
             updated_batch = dialog.get_batch_data()
             try:
                 self.inventory_service.update_batch(updated_batch)
-                QMessageBox.information(self, "Success", "Batch updated successfully.")
+                QMessageBox.information(self, "Success", f"Batch ID {updated_batch.batch_id} updated successfully.")
                 self.load_batches()
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to update batch: {str(e)}")
-
+                QMessageBox.critical(self, "Error", f"Failed to update batch: {e}")
+    
     def delete_batch(self):
-        """
-        Deletes the selected batch after confirmation.
-        """
         selected_row = self.table.currentRow()
         if selected_row < 0:
             QMessageBox.warning(self, "No Selection", "Please select a batch to delete.")
@@ -215,4 +175,8 @@ class BatchesManagement(QWidget):
                 QMessageBox.information(self, "Success", "Batch deleted successfully.")
                 self.load_batches()
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to delete batch: {str(e)}")
+                QMessageBox.critical(self, "Error", f"Failed to delete batch: {e}")
+    
+    def refresh_data(self):
+        self.load_batches()
+        QMessageBox.information(self, "Refreshed", "Batch data has been refreshed.")
