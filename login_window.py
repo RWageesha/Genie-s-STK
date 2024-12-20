@@ -1,16 +1,14 @@
-
-# filepath: /c:/Users/ASUS/Desktop/Layered/login_window.py
-
 import sys
 import os
 import json
 import hashlib
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton,
-    QMessageBox, QApplication, QHBoxLayout
+    QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox,
+    QApplication, QHBoxLayout, QGraphicsOpacityEffect, QToolButton
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QRect
+from PyQt6.QtGui import QIcon
 
 # Import your UI classes and setup function
 from UI.main_window import ModernSidebarUI
@@ -22,16 +20,28 @@ class LoginWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Login")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)  # Ensure style is applied immediately
         self.init_ui()
         self.apply_styles()
         self.setFixedSize(400, 500)
 
-    def init_ui(self):
-        main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(50, 50, 50, 50)
-        main_layout.setSpacing(20)
+        # Fade-in animation
+        self.opacity_effect = QGraphicsOpacityEffect(self)
+        self.setGraphicsEffect(self.opacity_effect)
+        self.animation = QPropertyAnimation(self.opacity_effect, b"opacity")
+        self.animation.setDuration(1000)
+        self.animation.setStartValue(0.0)
+        self.animation.setEndValue(1.0)
+        self.animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self.animation.start()
 
-        title = QLabel("Welcome Back")
+    def init_ui(self):
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(40, 40, 40, 40)
+        main_layout.setSpacing(15)
+
+        title = QLabel("Pharmacy Inventory \nManagement System")
         title.setObjectName("titleLabel")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(title)
@@ -41,11 +51,26 @@ class LoginWindow(QWidget):
         self.username_edit.setFixedHeight(40)
         main_layout.addWidget(self.username_edit)
 
+        # Connect returnPressed signal to authenticate
+        self.username_edit.returnPressed.connect(self.authenticate)
+
+        password_layout = QHBoxLayout()
         self.password_edit = QLineEdit()
         self.password_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self.password_edit.setPlaceholderText("Password")
         self.password_edit.setFixedHeight(40)
-        main_layout.addWidget(self.password_edit)
+        password_layout.addWidget(self.password_edit)
+
+        # Connect returnPressed signal to authenticate
+        self.password_edit.returnPressed.connect(self.authenticate)
+
+        self.toggle_password_btn = QToolButton()
+        self.toggle_password_btn.setIcon(QIcon(os.path.join(script_dir, "icons", "eye_closed.png")))
+        self.toggle_password_btn.setCheckable(True)
+        self.toggle_password_btn.clicked.connect(self.toggle_password_visibility)
+        password_layout.addWidget(self.toggle_password_btn)
+
+        main_layout.addLayout(password_layout)
 
         login_button = QPushButton("Login")
         login_button.setObjectName("primaryButton")
@@ -53,19 +78,52 @@ class LoginWindow(QWidget):
         login_button.setFixedHeight(40)
         main_layout.addWidget(login_button)
 
+        # Set the Login button as the default button
+        login_button.setDefault(True)
+
         signup_layout = QHBoxLayout()
         signup_label = QLabel("Don't have an account?")
         signup_button = QPushButton("Sign Up")
         signup_button.setFlat(True)
         signup_button.setStyleSheet("color: #00adb5;")
-        signup_button.clicked.connect(self.open_signup_window)  # Ensure method is defined
+        signup_button.clicked.connect(self.open_signup_window)
         signup_layout.addStretch()
         signup_layout.addWidget(signup_label)
         signup_layout.addWidget(signup_button)
         signup_layout.addStretch()
         main_layout.addLayout(signup_layout)
 
+        # Connect returnPressed signal in signup fields to register_user
+        signup_button.setDefault(True)
+
+        # Admin creation link
+        admin_layout = QHBoxLayout()
+        admin_label = QLabel("Create an Admin Account?")
+        admin_button = QPushButton("Create Admin")
+        admin_button.setFlat(True)
+        admin_button.setStyleSheet("color: #f08a5d;")
+        admin_button.clicked.connect(self.open_admin_create)
+        admin_layout.addStretch()
+        admin_layout.addWidget(admin_label)
+        admin_layout.addWidget(admin_button)
+        admin_layout.addStretch()
+        main_layout.addLayout(admin_layout)
+
         self.setLayout(main_layout)
+
+    def toggle_password_visibility(self):
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        if self.toggle_password_btn.isChecked():
+            self.password_edit.setEchoMode(QLineEdit.EchoMode.Normal)
+            self.toggle_password_btn.setIcon(QIcon(os.path.join(script_dir, "icons", "eye_open.png")))
+        else:
+            self.password_edit.setEchoMode(QLineEdit.EchoMode.Password)
+            self.toggle_password_btn.setIcon(QIcon(os.path.join(script_dir, "icons", "eye_closed.png")))
+
+    def open_admin_create(self):
+        from admin_account_create import AdminAccountCreationWindow
+        self.admin_window = AdminAccountCreationWindow()
+        self.admin_window.show()
 
     def apply_styles(self):
         self.setStyleSheet("""
@@ -109,6 +167,10 @@ class LoginWindow(QWidget):
             }
             QLabel {
                 font-size: 14px;
+            }
+            QToolButton {
+                border: none;
+                background: transparent;
             }
         """)
 
@@ -153,7 +215,6 @@ class LoginWindow(QWidget):
         self.close()
         if role == 'admin':
             try:
-                # Use a helper function or pass correct arguments if needed
                 inventory_service = setup_inventory_service()
                 self.main_window = ModernSidebarUI(inventory_service)
                 self.main_window.show()
@@ -161,7 +222,6 @@ class LoginWindow(QWidget):
                 QMessageBox.critical(self, "Error", f"Failed to open admin dashboard: {e}")
                 sys.exit(1)
         else:
-            # Import the user window class directly
             try:
                 from User.UI.user_window import UserMainWindow
             except ImportError:
@@ -171,7 +231,6 @@ class LoginWindow(QWidget):
             self.main_window.show()
 
     def open_signup_window(self):
-        # Show the SignupWindow
         self.signup_window = SignupWindow()
         self.signup_window.show()
 
@@ -180,11 +239,23 @@ class SignupWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Sign Up")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)  # Ensure style is applied immediately
         self.init_ui()
         self.apply_styles()
         self.setFixedSize(400, 600)
 
+        # Fade-in animation
+        self.opacity_effect = QGraphicsOpacityEffect(self)
+        self.setGraphicsEffect(self.opacity_effect)
+        self.animation = QPropertyAnimation(self.opacity_effect, b"opacity")
+        self.animation.setDuration(1000)
+        self.animation.setStartValue(0.0)
+        self.animation.setEndValue(1.0)
+        self.animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self.animation.start()
+
     def init_ui(self):
+        script_dir = os.path.dirname(os.path.abspath(__file__))
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(50, 50, 50, 50)
         main_layout.setSpacing(20)
@@ -199,17 +270,44 @@ class SignupWindow(QWidget):
         self.username_edit.setFixedHeight(40)
         main_layout.addWidget(self.username_edit)
 
+        # Connect returnPressed signal to register_user
+        self.username_edit.returnPressed.connect(self.register_user)
+
+        password_layout = QHBoxLayout()
         self.password_edit = QLineEdit()
         self.password_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self.password_edit.setPlaceholderText("Password")
         self.password_edit.setFixedHeight(40)
-        main_layout.addWidget(self.password_edit)
+        password_layout.addWidget(self.password_edit)
 
+        # Connect returnPressed signal to register_user
+        self.password_edit.returnPressed.connect(self.register_user)
+
+        self.toggle_password_btn = QToolButton()
+        self.toggle_password_btn.setIcon(QIcon(os.path.join(script_dir, "icons", "eye_closed.png")))
+        self.toggle_password_btn.setCheckable(True)
+        self.toggle_password_btn.clicked.connect(self.toggle_password_visibility)
+        password_layout.addWidget(self.toggle_password_btn)
+
+        main_layout.addLayout(password_layout)
+
+        confirm_password_layout = QHBoxLayout()
         self.confirm_password_edit = QLineEdit()
         self.confirm_password_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self.confirm_password_edit.setPlaceholderText("Confirm Password")
         self.confirm_password_edit.setFixedHeight(40)
-        main_layout.addWidget(self.confirm_password_edit)
+        confirm_password_layout.addWidget(self.confirm_password_edit)
+
+        # Connect returnPressed signal to register_user
+        self.confirm_password_edit.returnPressed.connect(self.register_user)
+
+        self.toggle_confirm_password_btn = QToolButton()
+        self.toggle_confirm_password_btn.setIcon(QIcon(os.path.join(script_dir, "icons", "eye_closed.png")))
+        self.toggle_confirm_password_btn.setCheckable(True)
+        self.toggle_confirm_password_btn.clicked.connect(self.toggle_confirm_password_visibility)
+        confirm_password_layout.addWidget(self.toggle_confirm_password_btn)
+
+        main_layout.addLayout(confirm_password_layout)
 
         signup_button = QPushButton("Sign Up")
         signup_button.setObjectName("primaryButton")
@@ -217,7 +315,28 @@ class SignupWindow(QWidget):
         signup_button.setFixedHeight(40)
         main_layout.addWidget(signup_button)
 
+        # Set the Sign Up button as the default button
+        signup_button.setDefault(True)
+
         self.setLayout(main_layout)
+
+    def toggle_password_visibility(self):
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        if self.toggle_password_btn.isChecked():
+            self.password_edit.setEchoMode(QLineEdit.EchoMode.Normal)
+            self.toggle_password_btn.setIcon(QIcon(os.path.join(script_dir, "icons", "eye_open.png")))
+        else:
+            self.password_edit.setEchoMode(QLineEdit.EchoMode.Password)
+            self.toggle_password_btn.setIcon(QIcon(os.path.join(script_dir, "icons", "eye_closed.png")))
+
+    def toggle_confirm_password_visibility(self):
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        if self.toggle_confirm_password_btn.isChecked():
+            self.confirm_password_edit.setEchoMode(QLineEdit.EchoMode.Normal)
+            self.toggle_confirm_password_btn.setIcon(QIcon(os.path.join(script_dir, "icons", "eye_open.png")))
+        else:
+            self.confirm_password_edit.setEchoMode(QLineEdit.EchoMode.Password)
+            self.toggle_confirm_password_btn.setIcon(QIcon(os.path.join(script_dir, "icons", "eye_closed.png")))
 
     def apply_styles(self):
         self.setStyleSheet("""
@@ -262,6 +381,10 @@ class SignupWindow(QWidget):
             QLabel {
                 font-size: 14px;
             }
+            QToolButton {
+                border: none;
+                background: transparent;
+            }
         """)
 
     def register_user(self):
@@ -305,6 +428,7 @@ class SignupWindow(QWidget):
         users_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'users.json')
         with open(users_file, 'w') as f:
             json.dump(users, f, indent=4)
+
 
 # Run the application if needed
 if __name__ == "__main__":
