@@ -15,21 +15,17 @@ class Settings(QDialog):
         # Apply styles
         self.setStyleSheet("""
             QDialog {
-                background-color: #1e1e2d; 
+                background-color: #1e1e2d;
                 border-radius: 10px;
-                color: transparent;
                 font-family: "Roboto", Arial, sans-serif;
             }
-            QLabel {
+            QLabel, QCheckBox {
                 font-size: 14px;
-                color: #ffffff;
+                color: #ff0000;
                 padding: 10px;
             }
-            QCheckBox {
-                font-size: 14px;
-                color: #ffffff;
-            }
         """)
+
 
         # Main layout
         layout = QVBoxLayout()

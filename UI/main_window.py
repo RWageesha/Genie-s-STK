@@ -376,7 +376,7 @@ class ModernSidebarUI(QMainWindow):
             auto_backup_enabled = True  # Default to enabled
 
         if auto_backup_enabled:
-            self.auto_backup_timer.start(300000)  # 5 minutes in milliseconds
+            self.auto_backup_timer.start(10000)  # 5 minutes in milliseconds
         else:
             self.auto_backup_timer.stop()
 

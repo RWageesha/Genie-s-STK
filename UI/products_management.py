@@ -1,5 +1,3 @@
-# ui/products_management.py
-
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QDialog
 )
@@ -20,14 +18,17 @@ class ProductsManagement(QWidget):
         self.add_product_btn = QPushButton("Add Product")
         self.edit_product_btn = QPushButton("Edit Product")
         self.delete_product_btn = QPushButton("Delete Product")
+        self.refresh_data_btn = QPushButton("Refresh")  # New Refresh button
         
         self.add_product_btn.clicked.connect(self.add_product)
         self.edit_product_btn.clicked.connect(self.edit_product)
         self.delete_product_btn.clicked.connect(self.delete_product)
+        self.refresh_data_btn.clicked.connect(self.refresh_data)  # Connect to a new method
         
         btn_layout.addWidget(self.add_product_btn)
         btn_layout.addWidget(self.edit_product_btn)
         btn_layout.addWidget(self.delete_product_btn)
+        btn_layout.addWidget(self.refresh_data_btn)  # Add Refresh button to layout
         btn_layout.addStretch()
         
         self.layout.addLayout(btn_layout)
@@ -47,7 +48,6 @@ class ProductsManagement(QWidget):
         self.apply_styles()
 
     def apply_styles(self):
-        # Apply modern UI design based on the provided guidelines
         self.setFont(QFont("Roboto", 14))
         self.setStyleSheet("""
             QWidget {
@@ -167,3 +167,7 @@ class ProductsManagement(QWidget):
                 self.load_products()
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to delete product: {e}")
+
+    def refresh_data(self):
+        self.load_products()
+        QMessageBox.information(self, "Refreshed", "Product data has been refreshed.")

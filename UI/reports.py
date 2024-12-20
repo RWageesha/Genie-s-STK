@@ -5,7 +5,6 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt
-
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from datetime import datetime
@@ -58,7 +57,7 @@ class Reports(QWidget):
         self.apply_styles()
 
     def apply_styles(self):
-        # Apply modern UI design based on the provided guidelines
+        # Apply modern UI design
         self.setFont(QFont("Roboto", 14))
         self.setStyleSheet("""
             QWidget {
@@ -191,6 +190,9 @@ class Reports(QWidget):
     
     def plot_bar_chart(self, data: Dict[str, float], title: str, xlabel: str, ylabel: str):
         self.canvas.figure.clear()
+        
+        # Set a slightly larger figure size for readability
+        self.canvas.figure.set_size_inches(6, 4)
         ax = self.canvas.figure.add_subplot(111)
 
         # Extract data
@@ -204,27 +206,40 @@ class Reports(QWidget):
         bars = ax.bar(products, sales, color='#00adb5', edgecolor='#323544')
 
         # Customize the appearance
-        ax.set_facecolor('#1e1e2d')  # Set plot background to match theme
-        ax.set_title(title, color='#00adb5', fontsize=16, pad=15)
-        ax.set_xlabel(xlabel, color='#c4c4c4', fontsize=12)
-        ax.set_ylabel(ylabel, color='#c4c4c4', fontsize=12)
+        ax.set_facecolor('#1e1e2d')  
+        ax.set_title(title, color='#00adb5', fontsize=18, pad=15, fontweight='bold')
+        ax.set_xlabel(xlabel, color='#c4c4c4', fontsize=14, labelpad=10)
+        ax.set_ylabel(ylabel, color='#c4c4c4', fontsize=14, labelpad=10)
 
         # Adjust X-axis ticks for better readability
         ax.set_xticks(range(len(products)))
-        ax.set_xticklabels(products, rotation=45, ha="right", fontsize=10, color='#c4c4c4')
+        ax.set_xticklabels(products, rotation=45, ha="right", fontsize=12, color='#c4c4c4')
+
+        # Use tick_params to set y-axis tick label colors and size
+        ax.tick_params(axis='y', colors='#c4c4c4', labelsize=12)
 
         # Add grid lines on Y-axis for clarity
-        ax.grid(axis='y', linestyle='--', linewidth=0.7, color='#5a5f66')
+        ax.grid(axis='y', linestyle='--', linewidth=0.7, color='#5a5f66', alpha=0.7)
 
         # Annotate each bar with values
+        if sales:
+            max_val = max(sales)
+        else:
+            max_val = 0
         for bar in bars:
             height = bar.get_height()
             ax.text(
-                bar.get_x() + bar.get_width() / 2, height + 500,  # Adjust Y offset
-                f"{height:.0f}", ha='center', va='bottom', color='#ffffff', fontsize=10
+                bar.get_x() + bar.get_width() / 2, 
+                height + (max_val * 0.01 if max_val > 0 else 0.1),
+                f"{height:.0f}", 
+                ha='center', 
+                va='bottom', 
+                color='#ffffff', 
+                fontsize=10, 
+                fontweight='bold'
             )
 
-        # Adjust the layout
+        # Use tight_layout to avoid label cutoff
         self.canvas.figure.tight_layout(pad=2.0)
         self.canvas.draw()
 
@@ -232,9 +247,8 @@ class Reports(QWidget):
     def plot_pie_chart(self, data: Dict[str, float], title: str):
         self.canvas.figure.clear()
 
-        # Explicitly set a larger figure size
-        self.canvas.figure.set_size_inches(6, 6)  # Adjust size (width, height)
-
+        # Set a larger figure size for readability
+        self.canvas.figure.set_size_inches(6, 6)
         ax = self.canvas.figure.add_subplot(111)
 
         labels = list(data.keys())
@@ -251,14 +265,13 @@ class Reports(QWidget):
             autopct='%1.1f%%',
             startangle=140,
             colors=colors,
-            textprops={'color': '#ffffff', 'fontsize': 10},
+            textprops={'color': '#ffffff', 'fontsize': 10, 'fontweight': 'bold'},
             wedgeprops={'edgecolor': '#323544'}
         )
 
-        # Adjust the chart's title and text properties
-        ax.set_title(title, color='#00adb5', fontsize=16, pad=15)
-
-        # Make the pie chart take up the full figure
+        # Adjust the chart's title
+        ax.set_title(title, color='#00adb5', fontsize=18, pad=20, fontweight='bold')
         ax.axis('equal')  # Equal aspect ratio ensures a perfect circle
-        self.canvas.figure.tight_layout(pad=1.5)  # Avoid clipping
+
+        self.canvas.figure.tight_layout(pad=2.0)
         self.canvas.draw()
