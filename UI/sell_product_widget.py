@@ -457,6 +457,7 @@ class SellProductWidget(QWidget):
             bill_lines = []
             bill_lines.append("------------------------------------------------\n")
             bill_lines.append("\n        ***** PHARMACY INVOICE *****\n\n")
+            bill_lines.append("------------------------------------------------\n")
             bill_lines.append(f"Date: {date.today().strftime('%Y-%m-%d')}                  Time: {datetime.now().strftime('%H:%M:%S')}\n")
             bill_lines.append("------------------------------------------------\n")
             bill_lines.append(f"{'Product':<20}{'Qty':>6}{'Price':>10}{'Total':>12}\n")
@@ -487,7 +488,7 @@ class SellProductWidget(QWidget):
                 )
 
             bill_lines.append("------------------------------------------------\n")
-            bill_lines.append(f"{'TOTAL':>38}{f'Rs{total:.2f}':>10}\n")
+            bill_lines.append(f"\x1D\x21\x11{'TOTAL':>38}{f'Rs{total:.2f}':>10}\x1D\x21\x00\n")
             bill_lines.append("------------------------------------------------\n")
             bill_lines.append("\n          Thank you for your purchase!\n")
             bill_lines.append("                   Visit again!\n")

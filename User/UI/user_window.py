@@ -225,6 +225,7 @@ class UserMainWindow(QMainWindow):
         # Define bottom button labels and icon paths
         bottom_button_info = [
             ("Contact", "icons/contact.svg"),
+            ("Logout", "icons/logout.svg"),
         ]
 
         for label, icon_path in bottom_button_info:
@@ -237,6 +238,8 @@ class UserMainWindow(QMainWindow):
             layout.addWidget(btn)
             if label == "Contact":
                 btn.clicked.connect(self.open_contact)
+            elif label == "Logout":
+                btn.clicked.connect(self.logout)
 
     def init_modules(self):
         # Initialize each module and add to the stacked widget
@@ -268,6 +271,11 @@ class UserMainWindow(QMainWindow):
         # Open the Contact Dialog
         contact_dialog = ContactDialog()
         contact_dialog.exec()
+
+    def logout(self):
+        self.close()
+        self.login_window = LoginWindow()
+        self.login_window.show()
 
 class HomePage(QWidget):
     def __init__(self):
@@ -455,8 +463,8 @@ class SearchProductsPage(QWidget):
             products = self.inventory.get_products()
             if algorithm == "Binary Search":
                 # Ensure the list is sorted by product_id
-                sorted_products = self.inventory.quick_sort(products.copy(), ["product_id"])
-                product = self.inventory.binary_search(sorted_products, product_id)
+                sorted_products = sorted(products, key=lambda x: x.product_id)
+                product = self.inventory.recursive_binary_search(sorted_products, product_id, 0, len(sorted_products) - 1)
             elif algorithm == "Linear Search":
                 product = self.inventory.linear_search(products, product_id)
             else:
@@ -543,7 +551,7 @@ class ReportsPage(QWidget):
             QMessageBox.warning(self, "Input Error", "Please enter a valid category name.")
 
     def calculate_value(self):
-        total = self.inventory.calculate_total_value()
+        total = self.inventory.calculate_total_value(self.inventory.products)
         self.value_result.setText(f"Total Inventory Value: Rs.{total:.2f}")
 
     def show_category_chart(self):
@@ -717,37 +725,20 @@ class Inventory:
         return self.products
 
     def quick_sort(self, arr, keys):
-        """
-        Iterative Quick Sort implementation.
-        """
-        if not arr:
-            return []
-
-        stack = [(0, len(arr) - 1)]
-
-        while stack:
-            low, high = stack.pop()
-            if low < high:
-                pivot_index = self.partition(arr, low, high, keys)
-                stack.append((low, pivot_index - 1))
-                stack.append((pivot_index + 1, high))
-
-        return arr
-
-    def partition(self, arr, low, high, keys):
-        pivot = arr[high]
-        i = low - 1
-        for j in range(low, high):
-            if self.compare_products(arr[j], pivot, keys) < 0:
-                i += 1
-                arr[i], arr[j] = arr[j], arr[i]
-        arr[i + 1], arr[high] = arr[high], arr[i + 1]
-        return i + 1
+        if len(arr) <= 1:
+            return arr
+        else:
+            pivot = arr[0]
+            less = []
+            greater = []
+            for item in arr[1:]:
+                if self.compare_products(item, pivot, keys) < 0:
+                    less.append(item)
+                else:
+                    greater.append(item)
+            return self.quick_sort(less, keys) + [pivot] + self.quick_sort(greater, keys)
 
     def shell_sort(self, arr, keys):
-        """
-        Iterative Shell Sort implementation.
-        """
         n = len(arr)
         gap = n // 2
         while gap > 0:
@@ -771,7 +762,7 @@ class Inventory:
             left = 0
             while left < n:
                 mid = min(left + current_size - 1, n - 1)
-                right = min(left + 2 * current_size - 1, n - 1)
+                right = min(2 * current_size + left - 1, n - 1)
                 if mid < right:
                     self.merge(arr, left, mid, right, keys)
                 left += 2 * current_size
@@ -801,13 +792,6 @@ class Inventory:
             k += 1
 
     def compare_products(self, a, b, keys):
-        """
-        Compare two products based on multiple keys.
-        Returns:
-            -1 if a < b
-             0 if a == b
-             1 if a > b
-        """
         for key in keys:
             a_value = getattr(a, key)
             b_value = getattr(b, key)
@@ -820,21 +804,17 @@ class Inventory:
                 return 1
         return 0
 
-    def binary_search(self, arr, target_id):
-        """
-        Iterative Binary Search implementation.
-        """
-        low = 0
-        high = len(arr) - 1
-        while low <= high:
-            mid = (low + high) // 2
+    def recursive_binary_search(self, arr, target_id, low, high):
+        if high >= low:
+            mid = (high + low) // 2
             if arr[mid].product_id == target_id:
                 return arr[mid]
             elif arr[mid].product_id > target_id:
-                high = mid - 1
+                return self.recursive_binary_search(arr, target_id, low, mid - 1)
             else:
-                low = mid + 1
-        return None
+                return self.recursive_binary_search(arr, target_id, mid + 1, high)
+        else:
+            return None
 
     def linear_search(self, arr, target_id):
         for item in arr:
@@ -849,12 +829,9 @@ class Inventory:
                 count += 1
         return count
 
-    def calculate_total_value(self):
-        """
-        Iterative calculation of total inventory value.
-        """
+    def calculate_total_value(self, products):
         total = 0.0
-        for product in self.products:
+        for product in products:
             total += product.price * product.quantity
         return total
 

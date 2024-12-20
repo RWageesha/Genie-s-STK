@@ -50,7 +50,7 @@ class BatchesManagement(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(5)
         self.table.setHorizontalHeaderLabels([
-            "Batch ID", "Product ID", "Quantity",
+            "Batch ID", "Product Name", "Quantity",
             "Manufacture Date", "Expiry Date"
         ])
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -126,7 +126,12 @@ class BatchesManagement(QWidget):
             self.table.setRowCount(len(batches))
             for row, batch in enumerate(batches):
                 self.table.setItem(row, 0, QTableWidgetItem(str(batch.batch_id)))
-                self.table.setItem(row, 1, QTableWidgetItem(str(batch.product_id)))
+                
+                # Fetch product name instead of product_id
+                product = self.inventory_service.get_product_by_id(batch.product_id)
+                product_name = product.name if product else "Unknown"
+                self.table.setItem(row, 1, QTableWidgetItem(product_name))
+                
                 self.table.setItem(row, 2, QTableWidgetItem(str(batch.quantity)))
                 self.table.setItem(row, 3, QTableWidgetItem(batch.manufacture_date.strftime("%Y-%m-%d")))
                 self.table.setItem(row, 4, QTableWidgetItem(batch.expiry_date.strftime("%Y-%m-%d")))

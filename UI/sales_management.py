@@ -1,7 +1,7 @@
 # ui/sales_management.py
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QDialog
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QDialog, QHeaderView
 )
 from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt
@@ -38,6 +38,7 @@ class SalesManagement(QWidget):
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         
         self.layout.addWidget(self.table)
         
@@ -98,21 +99,35 @@ class SalesManagement(QWidget):
         """)
 
     def load_sales(self):
-        self.table.setRowCount(0)
-        sales = self.inventory_service.get_all_sales()
-        for sale in sales:
-            row_position = self.table.rowCount()
-            self.table.insertRow(row_position)
-            self.table.setItem(row_position, 0, QTableWidgetItem(str(sale.sale_id)))
-            self.table.setItem(row_position, 1, QTableWidgetItem(sale.product.name if sale.product else ""))
-            self.table.setItem(row_position, 2, QTableWidgetItem(str(sale.quantity_sold)))
-            self.table.setItem(row_position, 3, QTableWidgetItem(sale.sale_date.strftime("%Y-%m-%d")))
-            self.table.setItem(row_position, 4, QTableWidgetItem(f"{sale.unit_price_at_sale:.2f}"))
-            total_value = sale.quantity_sold * sale.unit_price_at_sale
-            self.table.setItem(row_position, 5, QTableWidgetItem(f"{total_value:.2f}"))
-        self.table.resizeColumnsToContents()
+        """
+        Loads all sales from the inventory service and displays them in the table.
+        """
+        try:
+            self.table.setRowCount(0)
+            sales = self.inventory_service.get_all_sales()
+            for sale in sales:
+                row_position = self.table.rowCount()
+                self.table.insertRow(row_position)
+                
+                # Fetch product name using product_id
+                product = self.inventory_service.get_product_by_id(sale.product_id)
+                product_name = product.name if product else "Unknown"
+                
+                self.table.setItem(row_position, 0, QTableWidgetItem(str(sale.sale_id)))
+                self.table.setItem(row_position, 1, QTableWidgetItem(product_name))
+                self.table.setItem(row_position, 2, QTableWidgetItem(str(sale.quantity_sold)))
+                self.table.setItem(row_position, 3, QTableWidgetItem(sale.sale_date.strftime("%Y-%m-%d")))
+                self.table.setItem(row_position, 4, QTableWidgetItem(f"{sale.unit_price_at_sale:.2f}"))
+                total_value = sale.quantity_sold * sale.unit_price_at_sale
+                self.table.setItem(row_position, 5, QTableWidgetItem(f"{total_value:.2f}"))
+            self.table.resizeColumnsToContents()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to load sales: {str(e)}")
 
     def record_sale(self):
+        """
+        Opens the SellProductDialog to record a new sale.
+        """
         dialog = SellProductDialog(self, self.inventory_service)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             sale_record = dialog.get_sale_record_data()
@@ -124,22 +139,40 @@ class SalesManagement(QWidget):
                 QMessageBox.critical(self, "Error", f"Failed to record sale: {e}")
 
     def view_sale_details(self):
+        """
+        Displays the details of the selected sale.
+        """
         selected_items = self.table.selectedItems()
         if not selected_items:
             QMessageBox.warning(self, "No Selection", "Please select a sale to view details.")
             return
         row = selected_items[0].row()
-        sale_id = int(self.table.item(row, 0).text())
-        sale = self.inventory_service.get_sale_by_id(sale_id)
-        if not sale:
-            QMessageBox.critical(self, "Error", "Selected sale not found.")
+        sale_id_item = self.table.item(row, 0)
+        if not sale_id_item:
+            QMessageBox.critical(self, "Error", "Failed to retrieve selected sale ID.")
             return
-        details = (
-            f"Sale ID: {sale.sale_id}\n"
-            f"Product: {sale.product.name if sale.product else ''}\n"
-            f"Quantity Sold: {sale.quantity_sold}\n"
-            f"Sale Date: {sale.sale_date}\n"
-            f"Unit Price at Sale: {sale.unit_price_at_sale}\n"
-            f"Total Sale Value: {sale.quantity_sold * sale.unit_price_at_sale:.2f}"
-        )
-        QMessageBox.information(self, "Sale Details", details)
+        try:
+            sale_id = int(sale_id_item.text())
+        except ValueError:
+            QMessageBox.critical(self, "Error", "Invalid Sale ID.")
+            return
+
+        try:
+            sale = self.inventory_service.get_sale_by_id(sale_id)
+            if not sale:
+                QMessageBox.critical(self, "Error", "Selected sale not found.")
+                return
+            # Fetch product name using product_id
+            product = self.inventory_service.get_product_by_id(sale.product_id)
+            product_name = product.name if product else "Unknown"
+            details = (
+                f"Sale ID: {sale.sale_id}\n"
+                f"Product: {product_name}\n"
+                f"Quantity Sold: {sale.quantity_sold}\n"
+                f"Sale Date: {sale.sale_date.strftime('%Y-%m-%d')}\n"
+                f"Unit Price at Sale: {sale.unit_price_at_sale:.2f}\n"
+                f"Total Sale Value: {sale.quantity_sold * sale.unit_price_at_sale:.2f}"
+            )
+            QMessageBox.information(self, "Sale Details", details)
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to retrieve sale details: {e}")

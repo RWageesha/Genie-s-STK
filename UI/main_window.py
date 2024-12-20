@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QFrame, QStackedWidget, QLabel, QDialog, QMessageBox, QButtonGroup
 )
 from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, QTimer
 from PyQt6.QtSvg import QSvgRenderer  # Corrected import
 
 from .products_management import ProductsManagement
@@ -199,6 +199,9 @@ class ModernSidebarUI(QMainWindow):
         self.nav_buttons["Home"].setChecked(True)
         self.stack.setCurrentIndex(0)
 
+        # Initialize and start the auto backup timer
+        self.init_auto_backup()
+
     def init_sidebar_buttons(self, layout):
         # Define button labels and corresponding icon paths
         button_info = [
@@ -233,6 +236,7 @@ class ModernSidebarUI(QMainWindow):
         bottom_button_info = [
             ("Settings", "icons/settings.svg"),
             ("Contact", "icons/contact.svg"),
+            ("Log Out", "icons/logout.svg"),  # Added Log Out button
         ]
 
         for label, icon_path in bottom_button_info:
@@ -248,6 +252,8 @@ class ModernSidebarUI(QMainWindow):
                 btn.clicked.connect(self.open_settings)
             elif label == "Contact":
                 btn.clicked.connect(self.open_contact)
+            elif label == "Log Out":
+                btn.clicked.connect(self.logout)  # Connect Log Out button
 
     def init_modules(self):
         # Initialize each module and add to the stacked widget
@@ -313,6 +319,36 @@ class ModernSidebarUI(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Restore Error", f"An error occurred during restore: {e}")
 
+    def logout(self):
+        """
+        Logs out the current user by closing the main window and opening the login window.
+        """
+        from login_window import LoginWindow  # Local import to avoid circular dependency
+        self.login_window = LoginWindow()
+        self.login_window.show()
+        self.close()
+
+    def init_auto_backup(self):
+        """
+        Initializes the automatic backup timer to run every 5 seconds without user notification.
+        """
+        self.auto_backup_timer = QTimer(self)
+        self.auto_backup_timer.timeout.connect(self.auto_backup)
+        self.auto_backup_timer.start(5000)  # 5000 milliseconds = 5 seconds
+
+    def auto_backup(self):
+        """
+        Performs an automatic backup without notifying the user.
+        """
+        try:
+            data = fetch_data()
+            data_dict = convert_data_to_dict(data)
+            save_to_json(data_dict)
+            # No notification to the user
+        except Exception as e:
+            # Optionally log the error to a file or console
+            print(f"Auto Backup Error: {e}")
+
 # Run the App
 def run_app(inventory_service):
     app = QApplication(sys.argv)
@@ -322,9 +358,6 @@ def run_app(inventory_service):
 
 # Run the application
 if __name__ == "__main__":
-    import sys
     from PyQt6.QtWidgets import QApplication
-    app = QApplication(sys.argv)
-    window = ModernSidebarUI()
-    window.show()
-    sys.exit(app.exec())
+    inventory_service = None  # Initialize your inventory_service appropriately
+    run_app(inventory_service)
